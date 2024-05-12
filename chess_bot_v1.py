@@ -47,13 +47,32 @@ def get_evaluation(board: chess.Board) -> float:
         float: The evaluation
     """
     
+    # Gets the set of squares for each of the pieces on either sides from board
+    wKing = board.pieces(chess.KING, True)
+    bKing = board.pieces(chess.KING, False)
+    
+    wKnight = board.pieces(chess.KNIGHT, True)
+    bKnight = board.pieces(chess.KNIGHT, False)
+    
+    wBishop = board.pieces(chess.BISHOP, True)
+    bBishop = board.pieces(chess.BISHOP, False)
+    
+    wRook = board.pieces(chess.ROOK, True)
+    bRook = board.pieces(chess.ROOK, False)
+    
+    wQueen = board.pieces(chess.QUEEN, True)
+    bQueen = board.pieces(chess.QUEEN, False)
+    
+    wPawn = board.pieces(chess.PAWN, True)
+    bPawn = board.pieces(chess.PAWN, False)
+    
     # Calculates the material score
-    material_score = (10000 * (len(board.pieces(chess.KING, True) - len(board.pieces(chess.KING, False)))) +
-                      3 * (len(board.pieces(chess.KNIGHT, True) - len(board.pieces(chess.KNIGHT, False)))) +
-                      3.25 * (len(board.pieces(chess.BISHOP, True) - len(board.pieces(chess.BISHOP, False)))) +
-                      5 * (len(board.pieces(chess.ROOK, True) - len(board.pieces(chess.ROOK, False)))) +
-                      9 * (len(board.pieces(chess.QUEEN, True) - len(board.pieces(chess.QUEEN, False)))) +
-                      1 * (len(board.pieces(chess.PAWN, True) - len(board.pieces(chess.PAWN, False))))
+    material_score = (10000 * (len(wKing) - len(bKing)) +
+                      3 * (len(wKnight) - len(bKnight)) +
+                      3.25 * (len(wBishop) - len(bBishop)) +
+                      5 * (len(wRook) - len(bRook)) +
+                      9 * (len(wQueen) - len(bQueen)) +
+                      1 * (len(wPawn) - len(bPawn))
                     )
     
     white_mobility = 0
