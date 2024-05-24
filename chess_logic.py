@@ -81,7 +81,7 @@ class GameState:
             list: list of all valid moves
         """
         
-        return self.get_all_moves()
+        # Test for checks
         
     
     def in_check(self) -> bool:
