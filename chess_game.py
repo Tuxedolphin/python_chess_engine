@@ -26,6 +26,12 @@ def main() -> None:
     # Keeps track of the movement of piece
     piece_move = []
     
+    # Keeps track of all valid moves in current position
+    valid_moves = game_state.get_valid_moves()
+    
+    # Keeps track of if a move has been made, i.e. game state has been changed
+    move_made = False
+    
     while status:
         for event in pygame.event.get():
             
@@ -60,11 +66,33 @@ def main() -> None:
                     
                     else:
                         move = chess_logic.Move(piece_move[0], piece_move[1], game_state.board)
-                        game_state.make_move(move)
                         
-                        square_selected = ()
-                        piece_move = []
+                        # If move is valid, make move
+                        if move in valid_moves:
+                            game_state.make_move(move)
+                            move_made = True
+                            
+                            square_selected = ()
+                            piece_move = []
+                        
+                        # Else deselect
+                        else:
+                            square_selected = ()
+                            piece_move = []
             
+            # If person presses a key
+            elif event.type == pygame.KEYDOWN:
+                
+                # If left arrow was pressed, undo move
+                if event.key == pygame.K_LEFT:
+                    game_state.undo_move()
+                    move_made = True
+        
+        # IF move has been made, generate a list of all the valid moves    
+        if move_made:
+            valid_moves = game_state.get_valid_moves()
+            move_made = False
+        
         draw_board(screen, game_state)    
         clock.tick(30)
         pygame.display.flip()
