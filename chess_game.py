@@ -65,6 +65,7 @@ def main() -> None:
                         piece_move.pop(0)
                     
                     else:
+                        
                         move = chess_logic.Move(piece_move[0], piece_move[1], game_state.board)
                         
                         # If move is valid, make move
@@ -74,7 +75,7 @@ def main() -> None:
                             
                             square_selected = ()
                             piece_move = []
-                        
+                                
                         # Else deselect
                         else:
                             square_selected = ()
