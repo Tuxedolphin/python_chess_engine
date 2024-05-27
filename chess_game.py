@@ -92,6 +92,7 @@ def main() -> None:
         # IF move has been made, generate a list of all the valid moves    
         if move_made:
             valid_moves = game_state.get_valid_moves()
+            print(f"valid moves: {[move.get_chess_notation() for move in valid_moves]}")
             move_made = False
         
         draw_board(screen, game_state)    

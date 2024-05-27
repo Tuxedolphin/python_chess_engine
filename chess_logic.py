@@ -122,15 +122,21 @@ class GameState:
                     for i in range(1, 8):
                         
                         square = (king_row + check[2] * i, king_column + check[3] * i)
-                        valid_squares.append(square)
+                        
+                        if 0 <= square[0] < self.dimensions and 0 <= square[1] < self.dimensions:
+                            valid_squares.append(square)
+                        else:
+                            break
                         
                         # If it is the square where the piece can be captured
-                        if square == check:
+                        if square == (check[0], check[1]):
                             break
                         
                 # Get rid of moves that don't block the check or move the king
                 for move in moves.copy():
-                    if move.piece_moved != "K":
+                    
+                    if move.piece_moved[1] != "K":
+                        
                         if not (move.end_row, move.end_column) in valid_squares:
                             moves.remove(move)
             
@@ -150,7 +156,7 @@ class GameState:
         Returns a tuple for if the king is in check, the pins and the checks that are in the game state (if any)
 
         Returns:
-            tuple: a tuple of (bool, list, list)
+            tuple: a tuple of (in check, list of pins, list of checks)
         """
         
         pins = []
@@ -194,7 +200,7 @@ class GameState:
                                 break
                         
                         # Else if it is an opponent's piece
-                        else:
+                        elif end_piece[0] == opponent_colour:
                             type = end_piece[1]
                             
                             # Checking if a piece can put the king in check given its direction
@@ -529,11 +535,11 @@ class GameState:
         king_moves = ((-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, 0), (1, -1), (1, 1))
         turn = "w" if self.white_move else "b"
         
-        for i in range(8):
-            move_row = row + king_moves[i][0]
-            move_column = column + king_moves[i][1]
+        for move in king_moves:
+            move_row = row + move[0]
+            move_column = column + move[1]
             
-            if 0 <= move_row < self.dimensions and 0 <= move_column < self.dimensions:
+            if 0 <= move_row < self.dimensions and 0 <= move_column < self.dimensions:        
                 
                 # If it is not self's piece (i.e. either empty or opponent piece)
                 if not self.board[move_row][move_column].startswith(turn):
@@ -544,9 +550,7 @@ class GameState:
                     else:
                         self.black_king_location = (move_row, move_column)
                     
-                    in_check, _, _ = self.check_for_pins_checks()
-                    print(f"move {move_row, move_column} is in check: {in_check}")
-                    print(f"Testing other function: {self.king_in_check()}")
+                    in_check, _, checks = self.check_for_pins_checks()
                         
                     if not in_check:
                         moves.append(Move((row, column), (move_row, move_column), self.board))
@@ -556,8 +560,6 @@ class GameState:
                         self.white_king_location = (row, column)
                     else:
                         self.black_king_location = (row, column)
-                    
-                    moves.append(Move((row, column), (move_row, move_column), self.board))
         
         
 class Move:
