@@ -69,15 +69,26 @@ def main() -> None:
                         move = chess_logic.Move(piece_move[0], piece_move[1], game_state.board)
                         
                         # If move is valid, make move
-                        if move in valid_moves:
-                            game_state.make_move(move)
-                            move_made = True
-                            
-                            square_selected = ()
-                            piece_move = []
+                        for i in range(len(valid_moves)):
+                            if move == valid_moves[i]:
                                 
-                        # Else deselect
-                        else:
+                                promotion_piece = ""
+                                
+                                # If it is a pawn promotion, prompt user for which piece
+                                if move.is_pawn_promotion:
+                                    promotion_piece = input("Piece to be promoted (Q, N, B, R): ")
+                                    
+                                    #TODO: add GUI for this input
+                                
+                                game_state.make_move(valid_moves[i], promotion_piece)
+                                
+                                move_made = True
+                            
+                                square_selected = ()
+                                piece_move = []
+                                
+                        # If no moves made as it is illegal, deselect
+                        if not move_made:
                             square_selected = ()
                             piece_move = []
             
@@ -94,6 +105,18 @@ def main() -> None:
             valid_moves = game_state.get_valid_moves()
             print(f"valid moves: {[move.get_chess_notation() for move in valid_moves]}")
             move_made = False
+            
+            # Test for checkmate and stalemate
+            if not valid_moves:
+                game_state.white_move = not game_state.white_move
+                
+                winner = {True: "white",
+                          False: "black"}
+                
+                if game_state.in_check:
+                    print(f"Checkmate, {winner[game_state.white_move]} won!")
+                else:
+                    print("Stalemate, it is a draw")
         
         draw_board(screen, game_state)    
         clock.tick(30)

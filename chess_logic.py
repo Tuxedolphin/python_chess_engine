@@ -35,19 +35,26 @@ class GameState:
         self.pins = []
         self.checks = []
         
+        # Keep track of coordinate of square where en passant is possible
+        self.en_passant_square = ()
         
-    def make_move(self, move) -> None:
+        
+    def make_move(self, move, promotion_type: str = "") -> None:
         """
-        Makes a move given a move class
+        Makes a move given a move class, note that if it is a promotion, the proper input should be given
 
         Args:
             move (Move): A Move class of the move to be made
         """
         
+        # Update location of pieces
         self.board[move.start_row][move.start_column] = ""
         self.board[move.end_row][move.end_column] = move.piece_moved
 
         self.move_log.append(move)
+        
+        print(f"move is: {move.get_chess_notation()}")
+        print(f"is en passant: {move.is_en_passant}")
         
         if move.piece_moved == "wK":
             self.white_king_location = (move.end_row, move.end_column)
@@ -57,13 +64,34 @@ class GameState:
         
         self.white_move = not self.white_move
         
+        # If it is a pawn promotion
+        if move.is_pawn_promotion:
+            self.board[move.end_row][move.end_column] = move.piece_moved[0] + promotion_type
+        
+        # En passant
+        elif move.is_en_passant:
+            
+            # Capture the pawn
+            self.board[move.start_row][move.end_column] = ""
+            
+        # Check and update for squares where en passant is possible
+        if move.piece_moved[1] == "p" and abs(move.start_row - move.end_row) == 2:
+            
+            self.en_passant_square = ((move.start_row + move.end_row) // 2, move.end_column)
+        
+        # Else make sure no en passant is possible
+        else:
+            self.en_passant_square = ()
+        
+        print(f"en passant is possible at {self.en_passant_square}")
+        
     
     def undo_move(self) -> None:
         """
         Undoes the last move
         """
         
-        if len(self.move_log):
+        if self.move_log:
             move = self.move_log.pop()
             
             self.board[move.start_row][move.start_column] = move.piece_moved
@@ -77,6 +105,14 @@ class GameState:
             
             self.white_move = not self.white_move
             
+            # Undo en passant
+            if move.is_en_passant:
+                self.board[move.end_row][move.end_column] = ""
+                self.board[move.start_row][move.end_column] = move.piece_captured
+                self.en_passant_square = (move.end_row, move.end_column)
+                
+                print("Undone move was en passant")
+            
     
     def get_valid_moves(self) -> list:
         """
@@ -87,6 +123,7 @@ class GameState:
         """
         
         moves = []
+        temp_en_passant = self.en_passant_square
         
         self.in_check, self.pins, self.checks = self.check_for_pins_checks()
         
@@ -147,6 +184,8 @@ class GameState:
         # If king not in check, all moves are valid moves except for pins
         else:
             moves = self.get_all_moves()
+        
+        self.en_passant_square = temp_en_passant
             
         return moves
         
@@ -356,16 +395,25 @@ class GameState:
                     # Checking for pins
                     if not piece_pinned or pin_direction == (-1, -1):
                         moves.append(Move((row, column), (row - 1, column - 1), self.board))
+                        
+                # If it is empty, check if it is the square where en passant is possible
+                elif (row - 1, column - 1) == self.en_passant_square:
+                    if not piece_pinned or pin_direction == (-1, -1):
+                        moves.append(Move((row, column), (row - 1, column - 1), self.board, True))
 
             # If can capture to right
             if column + 1 < self.dimensions:
                 
-                # Check if piece that can be captured is white
+                # Check if piece that can be captured is black
                 if self.board[row - 1][column + 1].startswith("b"):
                     
                     # Check for any pins
                     if not piece_pinned or pin_direction == (-1, 1):
                         moves.append(Move((row, column), (row - 1, column + 1), self.board))
+                        
+                elif (row - 1, column + 1) == self.en_passant_square:
+                    if not piece_pinned or pin_direction == (-1, 1):
+                        moves.append(Move((row, column), (row - 1, column + 1), self.board, True))
             
         # For black pawns
         else:
@@ -384,13 +432,20 @@ class GameState:
                 if self.board[row + 1][column - 1].startswith("w"):
                     if not piece_pinned or pin_direction == (1, -1):
                         moves.append(Move((row, column), (row + 1, column - 1), self.board))
+                        
+                elif (row + 1, column - 1) == self.en_passant_square:
+                    if not piece_pinned or pin_direction == (1, -1):
+                        moves.append(Move((row, column), (row + 1, column - 1), self.board, True))
 
             if column + 1 < self.dimensions:
                 
                 if self.board[row + 1][column + 1].startswith("w"):
                     if not piece_pinned or pin_direction == (1, 1):
-                        moves.append(Move((row, column), (row + 1, column + 1), self.board))   
-    
+                        moves.append(Move((row, column), (row + 1, column + 1), self.board))
+                
+                elif (row + 1, column + 1) == self.en_passant_square:
+                    if not piece_pinned or pin_direction == (1, 1):
+                        moves.append(Move((row, column), (row + 1, column + 1), self.board, True))
     
     def get_rook_moves(self, row: int, column: int, moves: list) -> None:
         """ Appends to list all of the rook moves """
@@ -572,7 +627,7 @@ class Move:
     columns_to_files = {v: k for k, v in files_to_columns.items()}
 
 
-    def __init__(self, start: tuple, end: tuple, board: GameState) -> None:
+    def __init__(self, start: tuple, end: tuple, board: GameState, is_en_passant: bool = False) -> None:
         """
         Generates a chess move which keeps track of the move to be made, as well as
         the piece that is being moved and the piece that is being captured
@@ -581,9 +636,10 @@ class Move:
             start (tuple): row, column of initial starting square
             end (tuple): row, column of square for the piece to be moved to
             board (GameState.board): The current board
+            en_passant (set): The square where we can capture en passant
         """
 
-        # Uncouples the couple
+        # Uncouples the tuple
         self.start_row, self.start_column = start
         self.end_row, self.end_column = end
 
@@ -593,7 +649,17 @@ class Move:
 
         # A unique identifier to make it easier for comparing
         self.move = [start, end]
-
+        
+        # To keep track of if it is a pawn promotion
+        self.is_pawn_promotion = ((self.piece_moved == "wp" and self.end_row == 0) or (self.piece_moved == "bp" and self.end_row == 7))
+                
+        # Keep track of if move is en passant
+        self.is_en_passant = is_en_passant
+        
+        if is_en_passant:
+            self.piece_captured = board[self.start_row][self.end_column]
+        
+        
     def __eq__(self, other):
         if isinstance(other, Move):
             return self.move == other.move
