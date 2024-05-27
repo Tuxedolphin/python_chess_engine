@@ -38,6 +38,10 @@ class GameState:
         # Keep track of coordinate of square where en passant is possible
         self.en_passant_square = ()
         
+        # Keep track of castling rights
+        self.current_castle_rights = CastleRights(True, True, True, True)
+        self.castle_rights_log = [self.current_castle_rights]
+        
         
     def make_move(self, move, promotion_type: str = "") -> None:
         """
@@ -54,7 +58,6 @@ class GameState:
         self.move_log.append(move)
         
         print(f"move is: {move.get_chess_notation()}")
-        print(f"is en passant: {move.is_en_passant}")
         
         if move.piece_moved == "wK":
             self.white_king_location = (move.end_row, move.end_column)
@@ -83,7 +86,9 @@ class GameState:
         else:
             self.en_passant_square = ()
         
-        print(f"en passant is possible at {self.en_passant_square}")
+        # Update of castling rights
+        
+        # Take into account a bool maybe, such that if both sides can't castle we stop checking for this
         
     
     def undo_move(self) -> None:
@@ -123,7 +128,6 @@ class GameState:
         """
         
         moves = []
-        temp_en_passant = self.en_passant_square
         
         self.in_check, self.pins, self.checks = self.check_for_pins_checks()
         
@@ -184,8 +188,6 @@ class GameState:
         # If king not in check, all moves are valid moves except for pins
         else:
             moves = self.get_all_moves()
-        
-        self.en_passant_square = temp_en_passant
             
         return moves
         
@@ -636,7 +638,7 @@ class Move:
             start (tuple): row, column of initial starting square
             end (tuple): row, column of square for the piece to be moved to
             board (GameState.board): The current board
-            en_passant (set): The square where we can capture en passant
+            is_en_passant (bool): Whether or not the move is an en passant
         """
 
         # Uncouples the tuple
@@ -688,4 +690,13 @@ class Move:
         """
         return self.columns_to_files[column] + self.rows_to_ranks[row]
         
+
+class CastleRights():
     
+    def __init__(self, white_king_side, black_king_side, white_queen_side, black_queen_side):
+        
+        
+        self.white_king_side = white_king_side
+        self.black_king_side = black_king_side
+        self.white_queen_side = white_queen_side
+        self.black_queen_side = black_queen_side
