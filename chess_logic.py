@@ -40,7 +40,7 @@ class GameState:
         
         # Keep track of castling rights
         self.current_castle_rights = CastleRights(True, True, True, True)
-        self.castle_rights_log = [self.current_castle_rights]
+        self.castle_rights_log = [self.current_castle_rights.copy()]
         
         
     def make_move(self, move, promotion_type: str = "") -> None:
@@ -86,9 +86,11 @@ class GameState:
         else:
             self.en_passant_square = ()
         
-        # Update of castling rights
+        # If either side can still castle:
+        if self.current_castle_rights.can_castle():
+            self.current_castle_rights.update_castle_rights(move)
         
-        # Take into account a bool maybe, such that if both sides can't castle we stop checking for this
+        self.castle_rights_log.append(self.current_castle_rights.copy())
         
     
     def undo_move(self) -> None:
@@ -117,6 +119,10 @@ class GameState:
                 self.en_passant_square = (move.end_row, move.end_column)
                 
                 print("Undone move was en passant")
+    
+            # Undo castling rights
+            self.castle_rights_log.pop()
+            self.current_castle_rights  = self.castle_rights_log[-1]
             
     
     def get_valid_moves(self) -> list:
@@ -618,6 +624,35 @@ class GameState:
                     else:
                         self.black_king_location = (row, column)
         
+        self.get_castle_moves(row, column, moves, turn)
+        
+        
+    def get_castle_moves(self, row: int, column: int, moves: list, turn_colour: str) -> None:
+        """ Appends to list all of the castle moves """
+        
+        def get_king_castle_moves() -> Move:
+            """ Returns a Move class of the king side castling move"""
+            if not self.board[row][column + 1] and not self.board[row][column + 2]:
+                if not self.square_attacked(row, column + 1) and not self.square_attacked(row, column + 2):
+                    return Move((row, column), (row, column + 2), self.board, is_castle=True)
+            
+        def get_queen_castle_moves() -> Move:
+        
+        
+        # If king is in check, it can't castle
+        if self.king_in_check:
+            return
+        
+        if (self.white_move and self.current_castle_rights.white_king_side) or (not self.white_move and self.current_castle_rights.black_king_side):
+            moves.append(get_king_castle_moves())
+            
+        if (self.white_move and self.current_castle_rights.white_queen_side) or (not self.white_move and self.current_castle_rights.black_queen_side):
+            moves.append(get_queen_castle_moves())
+        
+        
+        
+        
+        
         
 class Move:
 
@@ -629,7 +664,7 @@ class Move:
     columns_to_files = {v: k for k, v in files_to_columns.items()}
 
 
-    def __init__(self, start: tuple, end: tuple, board: GameState, is_en_passant: bool = False) -> None:
+    def __init__(self, start: tuple, end: tuple, board: GameState, is_en_passant: bool = False, is_castle: bool = False) -> None:
         """
         Generates a chess move which keeps track of the move to be made, as well as
         the piece that is being moved and the piece that is being captured
@@ -639,11 +674,12 @@ class Move:
             end (tuple): row, column of square for the piece to be moved to
             board (GameState.board): The current board
             is_en_passant (bool): Whether or not the move is an en passant
+            is_castle (bool): Whether the current move is a castling move
         """
 
         # Uncouples the tuple
-        self.start_row, self.start_column = start
-        self.end_row, self.end_column = end
+        self.start_row, self.start_column = self.start = start
+        self.end_row, self.end_column = self.end = end
 
         # Stores the piece moved and piece captured (if any)
         self.piece_moved = board[self.start_row][self.start_column]
@@ -661,6 +697,8 @@ class Move:
         if is_en_passant:
             self.piece_captured = board[self.start_row][self.end_column]
         
+        # Keep track of if current move is a castling mvoe
+        self.is_castle = is_castle
         
     def __eq__(self, other):
         if isinstance(other, Move):
@@ -693,10 +731,76 @@ class Move:
 
 class CastleRights():
     
-    def __init__(self, white_king_side, black_king_side, white_queen_side, black_queen_side):
-        
+    def __init__(self, white_king_side: bool, black_king_side: bool, white_queen_side: bool, black_queen_side: bool):
+        """
+        Creates an object which holds information about either side's castling rights 
+
+        Args:
+            white_king_side (bool): Whether white can still castle king side
+            black_king_side (bool): Whether black can still castle king side
+            white_queen_side (bool): Whether white can still castle queen side
+            black_queen_side (bool): Whether black can still castle queen side
+        """
         
         self.white_king_side = white_king_side
         self.black_king_side = black_king_side
         self.white_queen_side = white_queen_side
         self.black_queen_side = black_queen_side
+        
+    
+    def update_castle_rights(self, move) -> None:
+        """
+        Update castle rights of either colour given a move
+
+        Args:
+            move (Move): Any chess move that was made using the Move class
+        """
+        
+        # If either king moves, either side loses castling rights
+        if move.piece_moved == "wK":
+            self.white_king_side = False
+            self.white_queen_side = False
+            
+        elif move.piece_moved == "bK":
+            self.black_king_side = False
+            self.black_queen_side = False
+            
+        # If white's king side rook is captured or moved, white can no longer castle king side
+        elif move.start == (7, 7) or move.end == (7, 7):
+            self.white_king_side = False
+        
+        # If white's queen side rook is captured of moved, white can no longer castle queen side
+        elif move.start == (7, 0) or move.end == (7, 0):
+            self.white_queen_side = False
+            
+        # Applying the same logic for black
+        elif self.start == (0, 7) or move.end == (0, 7):
+            self.black_king_side = False
+        
+        elif self.start == (0, 0) or move.end == (0, 0):
+            self.black_queen_side = False
+            
+        
+        def copy() -> CastleRights:
+            """ Returns a copy of the current object """
+            
+        return CastleRights(self.white_king_side, self.black_king_side, self.white_queen_side, self.black_queen_side)
+    
+    
+    def can_castle(self) -> bool:
+        """ Returns a bool based on if either side can still castle """
+        
+        return self.white_king_side or self.black_king_side or self.white_queen_side or self.black_queen_side
+    
+    
+    def colour_can_castle(self: str, turn: str) -> bool:
+        """ Returns a bool based on if the turn/ colour given can still castle """
+        
+        if turn == "w":
+            return self.white_king_side or self.white_queen_side
+        
+        elif turn == "b":
+            return self.black_king_side or self.black_queen_side
+        
+        else:
+            raise ValueError("Incorrect turn colour given")
