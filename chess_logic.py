@@ -44,6 +44,9 @@ class GameState:
         # Keep track of castling rights
         self.current_castle_rights = CastleRights(True, True, True, True)
         self.castle_rights_log = [self.current_castle_rights.copy()]
+        
+        # Keep track of both side's materials
+        self.white_material = self.black_material = 39
 
     def make_move(self, move, promotion_type: str = "") -> None:
         """
@@ -58,8 +61,6 @@ class GameState:
         self.board[move.end_row][move.end_column] = move.piece_moved
 
         self.move_log.append(move)
-
-        print(f"move is: {move.get_chess_notation()}")
 
         if move.piece_moved == "wK":
             self.white_king_location = (move.end_row, move.end_column)
@@ -138,8 +139,6 @@ class GameState:
                 self.board[move.start_row][move.end_column] = move.piece_captured
                 self.en_passant_square = (move.end_row, move.end_column)
 
-                print("Undone move was en passant")
-
             # Undo castling rights
             self.castle_rights_log.pop()
             self.current_castle_rights = copy.deepcopy(self.castle_rights_log[-1])
@@ -170,10 +169,6 @@ class GameState:
         moves = []
 
         self.in_check, self.pins, self.checks = self.check_for_pins_checks()
-
-        print(f"in check: {self.in_check}")
-        print(f"pins: {self.pins}")
-        print(f"checks: {self.checks}")
 
         # Getting the location of the king
         if self.white_move:
@@ -298,6 +293,7 @@ class GameState:
 
                         # Else if it is an opponent's piece
                         elif end_piece[0] == opponent_colour:
+                            print(end_piece, counter_row, counter_column)
                             type = end_piece[1]
 
                             # Checking if a piece can put the king in check given its direction
@@ -470,8 +466,9 @@ class GameState:
                     moves.append(Move((row, column), (row - 1, column), self.board))
 
                     # If it is on starting row, check if the 2nd square in front is empty
-                    if not self.board[row - 2][column] and row == 6:
-                        moves.append(Move((row, column), (row - 2, column), self.board))
+                    if row == 6:
+                        if not self.board[row - 2][column]:
+                            moves.append(Move((row, column), (row - 2, column), self.board))
 
             # Check for captures
 
@@ -521,8 +518,9 @@ class GameState:
                 if not piece_pinned or pin_direction == (1, 0):
                     moves.append(Move((row, column), (row + 1, column), self.board))
 
-                    if not self.board[row + 2][column] and row == 1:
-                        moves.append(Move((row, column), (row + 2, column), self.board))
+                    if row == 1:
+                        if self.board[row + 2][column]:
+                            moves.append(Move((row, column), (row + 2, column), self.board))
 
             if column - 1 >= 0:
 
@@ -792,7 +790,6 @@ class GameState:
                 if not self.square_attacked(
                     (row, column + 1)
                 ) and not self.square_attacked((row, column + 2)):
-                    print("King side castle is possible")
                     moves.append(
                         Move(
                             (row, column), (row, column + 2), self.board, is_castle=True
@@ -808,7 +805,6 @@ class GameState:
                 if not self.square_attacked(
                     (row, column - 1)
                 ) and not self.square_attacked((row, column - 2)):
-                    print("Queen side castle is possible")
                     moves.append(
                         Move(
                             (row, column), (row, column - 2), self.board, is_castle=True
@@ -819,19 +815,15 @@ class GameState:
         if self.in_check:
             return
 
-        print(f"castling moves are: {self.current_castle_rights}")
-
         if (self.white_move and self.current_castle_rights.white_king_side) or (
             not self.white_move and self.current_castle_rights.black_king_side
         ):
             get_king_castle_moves()
-            print("King side castle considered")
 
         if (self.white_move and self.current_castle_rights.white_queen_side) or (
             not self.white_move and self.current_castle_rights.black_queen_side
         ):
             get_queen_castle_moves()
-            print("Queen side castle considered")
 
 
 class Move:

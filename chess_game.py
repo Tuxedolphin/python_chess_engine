@@ -38,7 +38,13 @@ def main() -> None:
     # Whether or not the game has ended
     game_over = False
 
+    # Keeps track of if player is playing white and black
+    player_white, player_black = True, False
+
     while status:
+        
+        is_human_turn = (game_state.white_move and player_white) or (not game_state.white_move and player_black)
+        
         for event in pygame.event.get():
 
             # If quit
@@ -48,7 +54,7 @@ def main() -> None:
             # If person clicks on a piece
             elif event.type == pygame.MOUSEBUTTONDOWN:
 
-                if game_over:
+                if game_over or not is_human_turn:
                     continue
 
                 coordinates = pygame.mouse.get_pos()
@@ -133,13 +139,19 @@ def main() -> None:
                     animate = False
                     game_over = False
 
+        # Calls the required chess engine
+        if not game_over and not is_human_turn:
+            ai_move, ai_promotion_type, evaluation = chess_ai.materialistic_minimax_ai(valid_moves, game_state, depth=2)
+            game_state.make_move(ai_move, ai_promotion_type)
+            move_made = True
+            animate = True
+        
         # IF move has been made, generate a list of all the valid moves
         if move_made:
             if animate:
                 animate_moves(game_state.move_log[-1], screen, game_state.board, clock)
 
             valid_moves = game_state.get_valid_moves()
-            print(f"valid moves: {[move.get_chess_notation() for move in valid_moves]}")
             move_made = False
 
             # Test for checkmate and stalemate
@@ -310,7 +322,7 @@ def animate_moves(
 
     dR = move.end_row - move.start_row
     dC = move.end_column - move.start_column
-    frame_count = 12
+    frame_count = 13
 
     for frame in range(frame_count + 1):
         row, column = (
@@ -396,8 +408,6 @@ def animate_moves(
 
 def draw_text(screen: pygame.display, text: str) -> None:
     """Draws a text onto the screen"""
-
-    print("Draw text is called with text: " + text)
 
     font = pygame.font.SysFont("arial", 32, True, False)
     text_object = font.render(text, True, pygame.Color("black"), pygame.Color("white"))
