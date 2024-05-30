@@ -1,3 +1,5 @@
+import copy
+
 class GameState:
     """
     Class for storing all the information about state of board
@@ -85,8 +87,18 @@ class GameState:
         # Else make sure no en passant is possible
         else:
             self.en_passant_square = ()
+            
+        # If it is a king side castle, moves rook to new square
+        if move.king_side_castle:
+            self.board[move.end_row][move.end_column - 1] = self.board[move.end_row][move.end_column + 1]
+            self.board[move.end_row][move.end_column + 1] = ""
         
-        # If either side can still castle:
+        # Else it is a queen side castle, do the same except for the queen side
+        elif move.queen_side_castle:
+            self.board[move.end_row][move.end_column + 1] = self.board[move.end_row][move.end_column - 2]
+            self.board[move.end_row][move.end_column - 2] = ""
+                
+        # If either side could still castle, update castling rights
         if self.current_castle_rights.can_castle():
             self.current_castle_rights.update_castle_rights(move)
         
@@ -122,7 +134,18 @@ class GameState:
     
             # Undo castling rights
             self.castle_rights_log.pop()
-            self.current_castle_rights  = self.castle_rights_log[-1]
+            self.current_castle_rights  = copy.deepcopy(self.castle_rights_log[-1])
+            
+            # Undo castle move
+            # If it is a king side castle, moves rook to new square
+            if move.king_side_castle:
+                self.board[move.end_row][move.end_column + 1] = self.board[move.end_row][move.end_column - 1]
+                self.board[move.end_row][move.end_column - 1] = ""
+            
+            # Else it is a queen side castle, do the same except for the queen side
+            elif move.queen_side_castle:
+                self.board[move.end_row][move.end_column - 2] = self.board[move.end_row][move.end_column + 1]
+                self.board[move.end_row][move.end_column + 1] = "" 
             
     
     def get_valid_moves(self) -> list:
@@ -308,7 +331,7 @@ class GameState:
         
         # Switch turns to get the opponents turns
         self.white_move = not self.white_move
-        opponents_moves = self.get_all_moves()
+        opponents_moves = self.get_all_moves(True)
         self.white_move = not self.white_move
         
         for move in opponents_moves:
@@ -319,10 +342,13 @@ class GameState:
         
         return False
         
-    def get_all_moves(self) -> list:
+    def get_all_moves(self, for_square_under_attack: bool = False) -> list:
         """
         Returns all moves in current game state (without considering checks)
 
+        Args:
+            for_square_under_attack (bool): if the current function is being called by that function
+        
         Returns:
             list: list of all moves
         """
@@ -360,6 +386,9 @@ class GameState:
                                 
                             case "K":
                                 self.get_king_moves(row, column, moves)
+                                
+                                if not for_square_under_attack:
+                                    self.get_castle_moves(row, column, moves, turn)
                 
         return moves
 
@@ -623,9 +652,7 @@ class GameState:
                         self.white_king_location = (row, column)
                     else:
                         self.black_king_location = (row, column)
-        
-        self.get_castle_moves(row, column, moves, turn)
-        
+                        
         
     def get_castle_moves(self, row: int, column: int, moves: list, turn_colour: str) -> None:
         """ Appends to list all of the castle moves """
@@ -633,25 +660,29 @@ class GameState:
         def get_king_castle_moves() -> Move:
             """ Returns a Move class of the king side castling move"""
             if not self.board[row][column + 1] and not self.board[row][column + 2]:
-                if not self.square_attacked(row, column + 1) and not self.square_attacked(row, column + 2):
-                    return Move((row, column), (row, column + 2), self.board, is_castle=True)
+                if not self.square_attacked((row, column + 1)) and not self.square_attacked((row, column + 2)):
+                    print("King side castle is possible")
+                    moves.append(Move((row, column), (row, column + 2), self.board, is_castle=True))
             
         def get_queen_castle_moves() -> Move:
-        
+            if not self.board[row][column - 1] and not self.board[row][column - 2] and not self.board[row][column - 3]:
+                if not self.square_attacked((row, column - 1)) and not self.square_attacked((row, column - 2)):
+                    print("Queen side castle is possible")
+                    moves.append(Move((row, column), (row, column - 2), self.board, is_castle=True))
         
         # If king is in check, it can't castle
-        if self.king_in_check:
+        if self.in_check:
             return
         
+        print(f"castling moves are: {self.current_castle_rights}")
+        
         if (self.white_move and self.current_castle_rights.white_king_side) or (not self.white_move and self.current_castle_rights.black_king_side):
-            moves.append(get_king_castle_moves())
+            get_king_castle_moves()
+            print("King side castle considered")
             
         if (self.white_move and self.current_castle_rights.white_queen_side) or (not self.white_move and self.current_castle_rights.black_queen_side):
-            moves.append(get_queen_castle_moves())
-        
-        
-        
-        
+            get_queen_castle_moves()
+            print("Queen side castle considered")
         
         
 class Move:
@@ -697,8 +728,20 @@ class Move:
         if is_en_passant:
             self.piece_captured = board[self.start_row][self.end_column]
         
-        # Keep track of if current move is a castling mvoe
+        # Keep track of if current move is a castling move
         self.is_castle = is_castle
+        
+        if self.is_castle:
+            
+            # Take down if it is a king side castle
+            self.king_side_castle = True if (self.end_column - self.start_column == 2) else False
+                
+            # Take down if it is queen side castle (can only be queen side if it is a castling move and it is not king side)
+            self.queen_side_castle = not self.king_side_castle
+        
+        # If it is not a castling move, it cannot be either castle
+        else:
+            self.king_side_castle = self.queen_side_castle = False
         
     def __eq__(self, other):
         if isinstance(other, Move):
@@ -712,6 +755,13 @@ class Move:
         Returns:
             str: the chess notation of the move
         """
+        
+        if self.king_side_castle:
+            return "O-O"
+        
+        if self.queen_side_castle:
+            return "O-O-O"
+        
         return self.get_rank_file(self.start_row, self.start_column) + self.get_rank_file(self.end_row, self.end_column)
         
     
@@ -774,16 +824,16 @@ class CastleRights():
             self.white_queen_side = False
             
         # Applying the same logic for black
-        elif self.start == (0, 7) or move.end == (0, 7):
+        elif move.start == (0, 7) or move.end == (0, 7):
             self.black_king_side = False
         
-        elif self.start == (0, 0) or move.end == (0, 0):
+        elif move.start == (0, 0) or move.end == (0, 0):
             self.black_queen_side = False
             
         
-        def copy() -> CastleRights:
-            """ Returns a copy of the current object """
-            
+    def copy(self):
+        """ Returns a copy of the current object """
+        
         return CastleRights(self.white_king_side, self.black_king_side, self.white_queen_side, self.black_queen_side)
     
     
@@ -804,3 +854,7 @@ class CastleRights():
         
         else:
             raise ValueError("Incorrect turn colour given")
+        
+    
+    def __str__(self):
+        return f"White: {self.white_king_side, self.white_queen_side}, Black: {self.black_king_side, self.black_queen_side}"
