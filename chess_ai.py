@@ -106,16 +106,6 @@ def materialistic_minimax_ai(
     # If the recursion is over, simply return a random move
     if current_depth == depth:
         return return_move(valid_moves[0], current_evaluation)
-    
-    # Keep track of values of each move
-    values = {
-        "Q": 9,
-        "R": 5,
-        "B": 3,
-        "N": 3,
-        "p": 1,
-        "promotion": 8,
-    }
 
     # Keeps track of the number of ply
     current_depth += 1
@@ -129,25 +119,12 @@ def materialistic_minimax_ai(
     # Finds the best moves for the current iteration
     for move in valid_moves:
         
-        # Gets the net value of the move
-        value = 0
-
-        if move.piece_captured:
-            value = values[move.piece_captured[1]]
-
-        if move.is_pawn_promotion:
-            value += values["promotion"]
-
-        evaluation = (
-            current_evaluation + value
-            if ai_turn
-            else current_evaluation - value
-        )
-
         # Creates a copy of the game state so that it is not altered
         copied_game_state = copy.deepcopy(game_state)
         copied_game_state.make_move(move)
         copied_valid_moves = copied_game_state.get_valid_moves()
+        
+        evaluation = game_state.white_material if game_state.white_move else game_state.black_material
         
         if not copied_valid_moves:
             continue

@@ -39,7 +39,7 @@ def main() -> None:
     game_over = False
 
     # Keeps track of if player is playing white and black
-    player_white, player_black = True, False
+    player_white, player_black = True, True
 
     while status:
         

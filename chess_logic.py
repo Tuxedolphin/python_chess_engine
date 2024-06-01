@@ -6,6 +6,17 @@ class GameState:
     Class for storing all the information about state of board
     """
 
+    # Keep track of values of each piece
+    values = {
+        "Q": 9,
+        "R": 5,
+        "B": 3,
+        "N": 3,
+        "p": 1,
+        "K": 10000,
+        "promotion": 8,
+    }
+    
     def __init__(self) -> None:
 
         # Generates a list of list which represents the initial board state
@@ -67,20 +78,41 @@ class GameState:
 
         elif move.piece_moved == "bK":
             self.black_king_location = (move.end_row, move.end_column)
-
-        self.white_move = not self.white_move
-
+        
+        # If a piece was captured
+        if move.piece_captured:
+            
+            # Get the value of the piece and subtract it from the player
+            value = self.values[move.piece_captured[1]]
+            
+            if self.white_move:
+                self.black_material -= value
+            
+            else:
+                self.white_material -= value
+        
         # If it is a pawn promotion
         if move.is_pawn_promotion:
             self.board[move.end_row][move.end_column] = (
                 move.piece_moved[0] + promotion_type
             )
-
+            
+            # Update the material count
+            # TODO: Update to ensure that other possible promotion types are accounted for
+            if self.white_move:
+                self.white_material += 8
+            
+            else:
+                self.black_material += 8
+        
         # En passant
         elif move.is_en_passant:
 
             # Capture the pawn
             self.board[move.start_row][move.end_column] = ""
+
+        print(f"White: {self.white_material}, black: {self.black_material}")
+
 
         # Check and update for squares where en passant is possible
         if move.piece_moved[1] == "p" and abs(move.start_row - move.end_row) == 2:
@@ -113,6 +145,8 @@ class GameState:
             self.current_castle_rights.update_castle_rights(move)
 
         self.castle_rights_log.append(self.current_castle_rights.copy())
+        
+        self.white_move = not self.white_move
 
     def undo_move(self) -> None:
         """
@@ -157,6 +191,23 @@ class GameState:
                     move.end_row
                 ][move.end_column + 1]
                 self.board[move.end_row][move.end_column + 1] = ""
+                
+            # Undoing the material count
+            if move.piece_captured:
+                value = self.values[move.piece_captured[1]]
+                
+                if self.white_move:
+                    self.black_material += value
+                    
+                else:
+                    self.white_material += value
+                    
+            if move.is_pawn_promotion:
+                if self.white_move:
+                    self.white_material -= 8
+                    
+                else:
+                    self.black_material -= 8
 
     def get_valid_moves(self) -> list:
         """
@@ -293,7 +344,6 @@ class GameState:
 
                         # Else if it is an opponent's piece
                         elif end_piece[0] == opponent_colour:
-                            print(end_piece, counter_row, counter_column)
                             type = end_piece[1]
 
                             # Checking if a piece can put the king in check given its direction
@@ -519,7 +569,7 @@ class GameState:
                     moves.append(Move((row, column), (row + 1, column), self.board))
 
                     if row == 1:
-                        if self.board[row + 2][column]:
+                        if not self.board[row + 2][column]:
                             moves.append(Move((row, column), (row + 2, column), self.board))
 
             if column - 1 >= 0:
