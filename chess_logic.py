@@ -111,8 +111,6 @@ class GameState:
             # Capture the pawn
             self.board[move.start_row][move.end_column] = ""
 
-        print(f"White: {self.white_material}, black: {self.black_material}")
-
 
         # Check and update for squares where en passant is possible
         if move.piece_moved[1] == "p" and abs(move.start_row - move.end_row) == 2:
@@ -242,7 +240,7 @@ class GameState:
 
                 # If it is a knight, must move the king or capture the knight
                 if piece_checking[1] == "N":
-                    valid_squares.append(check)
+                    valid_squares.append((check[0], check[1]))
 
                 # Else, it can block the check where piece can move from king to attacking piece
                 else:

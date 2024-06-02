@@ -11,7 +11,7 @@ def return_move(move: Move, evaluation) -> tuple[Move, str, int]:
     """
 
     if move.is_pawn_promotion:
-        return move, "Q"
+        return move, "Q", evaluation
 
     return move, "", evaluation
 
@@ -93,8 +93,6 @@ def materialistic_minimax_ai(
     game_state: GameState,
     depth: int = 2,
     current_depth: int = 0,
-    current_evaluation: int = 0,
-    ai_turn: bool = True,
 ) -> tuple[Move, str, int]:
     """
     An AI which only considers material, except that it will recursively call itself up
@@ -103,15 +101,17 @@ def materialistic_minimax_ai(
     No alpha beta pruning used
     """
     
+    current_material = game_state.white_material - game_state.black_material
+    
     # If the recursion is over, simply return a random move
     if current_depth == depth:
-        return return_move(valid_moves[0], current_evaluation)
-
+        return return_move(valid_moves[0], current_material)
+    
     # Keeps track of the number of ply
     current_depth += 1
 
     # Keep track of the move which gains/ captures the most points
-    best_net_evaluation = -100000
+    best_net_evaluation = -100000 if game_state.white_move else 100000
 
     # Keeps track of the moves which has the max points
     best_net_moves = []
@@ -119,32 +119,35 @@ def materialistic_minimax_ai(
     # Finds the best moves for the current iteration
     for move in valid_moves:
         
-        # Creates a copy of the game state so that it is not altered
+        # Creates a copy of the game state so that it is not altered and gets a new evaluation
         copied_game_state = copy.deepcopy(game_state)
         copied_game_state.make_move(move)
         copied_valid_moves = copied_game_state.get_valid_moves()
         
-        evaluation = game_state.white_material if game_state.white_move else game_state.black_material
-        
         if not copied_valid_moves:
             continue
-
-        move, _, evaluation = materialistic_minimax_ai(
+        
+        _, _, evaluation = materialistic_minimax_ai(
             copied_valid_moves,
             copied_game_state,
             depth,
-            current_depth=current_depth,
-            current_evaluation=evaluation,
-            ai_turn=not ai_turn,
+            current_depth=current_depth
         )
 
-        if evaluation > best_net_evaluation:
-            best_net_evaluation = evaluation
-            best_net_moves = [move]
+        if game_state.white_move:
+            if evaluation > best_net_evaluation:
+                best_net_evaluation = evaluation
+                best_net_moves = [move]
+                
+        else:
+            if evaluation < best_net_evaluation:
+                best_net_evaluation = evaluation
+                best_net_moves = [move]
 
-        elif evaluation == best_net_evaluation:
+        if evaluation == best_net_evaluation:
             best_net_moves.append(move)
 
     # If it is the last iteration, return a random move
     best_move = return_random_move(best_net_moves)
-    return return_move(best_move, evaluation)
+
+    return return_move(best_move, best_net_evaluation)
