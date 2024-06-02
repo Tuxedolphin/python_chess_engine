@@ -39,7 +39,7 @@ def main() -> None:
     game_over = False
 
     # Keeps track of if player is playing white and black
-    player_white, player_black = False, False
+    player_white, player_black = True, False
 
     while status:
         
@@ -144,7 +144,6 @@ def main() -> None:
             ai_move, ai_promotion_type, evaluation = chess_ai.materialistic_minimax_ai(valid_moves, game_state, depth=3)
             game_state.make_move(ai_move, ai_promotion_type)
             print(f"move:{ai_move.get_chess_notation()}, evaluation: {evaluation}")
-            print(f"{game_state.white_material}, {game_state.black_material}")
             
             move_made = True
             animate = True

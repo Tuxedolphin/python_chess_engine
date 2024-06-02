@@ -13,7 +13,6 @@ class GameState:
         "B": 3,
         "N": 3,
         "p": 1,
-        "K": 10000,
         "promotion": 8,
     }
     
