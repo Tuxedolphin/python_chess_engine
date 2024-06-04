@@ -9,6 +9,8 @@ def return_move(move: Move, evaluation) -> tuple[Move, str, int]:
 
     Assumes to always promote to queen for now
     """
+    if not move:
+        return None, "", evaluation
 
     if move.is_pawn_promotion:
         return move, "Q", evaluation
@@ -18,13 +20,13 @@ def return_move(move: Move, evaluation) -> tuple[Move, str, int]:
 
 def return_random_move(moves: list[Move]) -> Move:
     """Returns a random move from a list of moves
-    
+
     Returns None if there is no move"""
 
     # Change the seed to make it more random
     random.seed()
     length = len(moves)
-    
+
     if not length:
         return None
 
@@ -168,47 +170,90 @@ def materialistic_minimax_ai(
     return return_move(best_move, best_net_evaluation)
 
 
-def minimax_ai(
+def negamax_ai(
     game_state: GameState, valid_moves: list[Move], depth: int
 ) -> tuple[Move, str, float]:
     """
-    A minimax AI which has a much more complex evaluation function, did not make use of copy
+    A negamax AI which has a much more complex evaluation function, did not make use of copy
     """
 
-    if not depth:
-        return return_move(return_random_move(valid_moves), get_board_evaluation(game_state, valid_moves))
-
-    best_net_evaluation = -100000 if game_state.white_move else 100000
+    # To hold the max score among the moves
+    max_evaluation = -100000
 
     best_net_moves = []
 
+    turn_multiplier = 1 if game_state.white_move else -1
+
     for move in valid_moves:
-        
+
         if move.is_pawn_promotion:
             game_state.make_move(move, "Q")
-        
+
         else:
             game_state.make_move(move)
-        
+
         next_valid_moves = game_state.get_valid_moves()
 
-        _, _, evaluation = minimax_ai(game_state, next_valid_moves, depth - 1)
-
-        best_net_evaluation, best_net_moves = compare_evaluations(
-            move,
-            evaluation,
-            best_net_evaluation,
-            best_net_moves,
-            not game_state.white_move,
+        evaluation = -get_negamax_evaluation(
+            game_state, next_valid_moves, depth - 1, -turn_multiplier
         )
+
+        # Compare the evaluations, we do not need to call the function since we only check for max
+        if evaluation > max_evaluation:
+            max_evaluation = evaluation
+            best_net_moves = [move]
+
+        elif evaluation == max_evaluation:
+            best_net_moves.append(move)
 
         game_state.undo_move()
 
-    return return_move(return_random_move(best_net_moves), best_net_evaluation)
+    return return_move(return_random_move(best_net_moves), max_evaluation)
+
+
+def get_negamax_evaluation(
+    game_state: GameState, valid_moves: list[Move], depth: int, turn_multiplier: int, alpha: float, beta: float
+) -> float:
+    """
+    Returns the evaluation of a given position using the negamax algorithm
+    
+    Alpha beta pruning used.
+    """
+
+    if not depth:
+        return turn_multiplier * get_board_evaluation(game_state, valid_moves)
+
+    max_evaluation = -100000
+
+    for move in valid_moves:
+        if move.is_pawn_promotion:
+            game_state.make_move(move, "Q")
+
+        else:
+            game_state.make_move(move)
+
+        next_valid_moves = game_state.get_valid_moves()
+
+        evaluation = -get_negamax_evaluation(
+            game_state, next_valid_moves, depth - 1, -turn_multiplier
+        )
+
+        if evaluation > max_evaluation:
+            max_evaluation = evaluation
+
+        game_state.undo_move()
+
+    return max_evaluation
 
 
 def get_board_evaluation(game_state: GameState, valid_moves: list[Move]) -> float:
-    """Returns the board evaluation, with a larger number being better for white and vice versa"""
+    """
+    Returns the board evaluation, with a larger number being better 
+    
+    Factors considered:
+    1) Is the position checkmate or stalemate
+    2) Material count
+    """
 
     # If there are no valid moves, it is either checkmate or stalemate
     if not valid_moves:
