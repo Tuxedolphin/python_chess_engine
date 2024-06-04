@@ -17,14 +17,16 @@ def return_move(move: Move, evaluation) -> tuple[Move, str, int]:
 
 
 def return_random_move(moves: list[Move]) -> Move:
-    """Returns a random move from a list of moves"""
+    """Returns a random move from a list of moves
+    
+    Returns None if there is no move"""
 
     # Change the seed to make it more random
     random.seed()
-
     length = len(moves)
+    
     if not length:
-        raise ValueError("No item in list of moves")
+        return None
 
     if length == 1:
         return moves[0]
@@ -103,7 +105,7 @@ def materialistic_minimax_ai(
 
     # Keeps track of the number of ply
     current_depth += 1
-    
+
     # Keep track of who's turn it is
     white_move = game_state.white_move
 
@@ -166,16 +168,69 @@ def materialistic_minimax_ai(
     return return_move(best_move, best_net_evaluation)
 
 
+def minimax_ai(
+    game_state: GameState, valid_moves: list[Move], depth: int
+) -> tuple[Move, str, float]:
+    """
+    A minimax AI which has a much more complex evaluation function, did not make use of copy
+    """
+
+    if not depth:
+        return return_move(return_random_move(valid_moves), get_board_evaluation(game_state, valid_moves))
+
+    best_net_evaluation = -100000 if game_state.white_move else 100000
+
+    best_net_moves = []
+
+    for move in valid_moves:
+        
+        if move.is_pawn_promotion:
+            game_state.make_move(move, "Q")
+        
+        else:
+            game_state.make_move(move)
+        
+        next_valid_moves = game_state.get_valid_moves()
+
+        _, _, evaluation = minimax_ai(game_state, next_valid_moves, depth - 1)
+
+        best_net_evaluation, best_net_moves = compare_evaluations(
+            move,
+            evaluation,
+            best_net_evaluation,
+            best_net_moves,
+            not game_state.white_move,
+        )
+
+        game_state.undo_move()
+
+    return return_move(return_random_move(best_net_moves), best_net_evaluation)
+
+
+def get_board_evaluation(game_state: GameState, valid_moves: list[Move]) -> float:
+    """Returns the board evaluation, with a larger number being better for white and vice versa"""
+
+    # If there are no valid moves, it is either checkmate or stalemate
+    if not valid_moves:
+        if game_state.in_check:
+            return -10000 if game_state.white_move else 10000
+
+        else:
+            return 0
+
+    return game_state.white_material - game_state.black_material
+
+
 def compare_evaluations(
     move: Move,
-    move_evaluation: int,
-    best_evaluation: int,
+    move_evaluation: float,
+    best_evaluation: float,
     move_list: list[Move],
     white_move: bool,
-) -> tuple[int, list[Move]]:
-    """ 
+) -> tuple[float, list[Move]]:
+    """
     Compares the evaluations of a move with that of the best evaluation, and edits the move list accordingly.
-    
+
     Returns the best evaluation and the list as well due to some bug that I can't figure out the reason behind :(
     """
 
@@ -200,10 +255,3 @@ def compare_evaluations(
             best_evaluation = move_evaluation
 
     return best_evaluation, move_list
-
-def minimax_ai():
-    ...
-    
-
-def get_board_evaluation(game_state: GameState) -> int:
-    ...
