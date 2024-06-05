@@ -959,10 +959,40 @@ class Move:
         if self.queen_side_castle:
             return "O-O-O"
 
-        return self.get_rank_file(
-            self.start_row, self.start_column
+        return self.get_rank_file(self.start_row, self.start_column
         ) + self.get_rank_file(self.end_row, self.end_column)
+        
+    def get_pgn_chess_notation(self) -> str:
+        """
+        Returns a string of the pgn notation of a chess notation of the move.
+        Does not support promotions, checks, mates, and remove ambiguity
 
+        Returns:
+            str: the chess notation
+        """
+        
+        if self.king_side_castle:
+            return "O-O"
+
+        if self.queen_side_castle:
+            return "O-O-O"
+        
+        piece_captured = ""
+        
+        end_square = self.get_rank_file(self.end_row, self.end_column)
+        
+        if self.piece_captured:
+            piece_captured = "x"
+        
+        if self.piece_moved[1] == "p":
+            if self.piece_captured:
+                return self.columns_to_files[self.start_column] + piece_captured + end_square
+            
+            return self.get_rank_file(self.end_row, self.end_column)
+        
+        else:
+            return self.piece_moved[1] + piece_captured + end_square
+        
     def get_rank_file(self, row: int, column: int) -> str:
         """
         Returns the chess notation of the required row and column
@@ -976,6 +1006,8 @@ class Move:
         """
         return self.columns_to_files[column] + self.rows_to_ranks[row]
 
+    def __str__(self):
+        return self.get_chess_notation()
 
 class CastleRights:
 

@@ -3,7 +3,8 @@ import chess_logic
 import chess_ai
 
 
-WIDTH = HEIGHT = 512  # For dimensions of pieces
+WIDTH = HEIGHT = 512  # For dimensions of board
+MOVE_LOG_WIDTH = 250 # For dimensions of move log window
 DIMENSION = 8  # The dimensions of a chess board
 SQUARE_SIZE = HEIGHT // DIMENSION  # Getting the integer size of the square
 IMAGES = {}
@@ -11,12 +12,19 @@ IMAGES = {}
 
 def main() -> None:
     pygame.init()
-    screen = pygame.display.set_mode((WIDTH, HEIGHT))
+    screen = pygame.display.set_mode((WIDTH + MOVE_LOG_WIDTH, HEIGHT))
     clock = pygame.time.Clock()
     screen.fill(pygame.Color("white"))
 
     game_state = chess_logic.GameState()
     load_images()
+    
+    # The font of the move log
+    move_log_font = pygame.font.SysFont("arial", 15, False, False)
+    
+    # To keep track of how much the user has scrolled the move log
+    global delta_y
+    delta_y = 0
 
     status = True
 
@@ -39,19 +47,30 @@ def main() -> None:
     game_over = False
 
     # Keeps track of if player is playing white and black
-    player_white, player_black = True, True
+    player_white, player_black = True, False
 
     while status:
-        
-        is_human_turn = (game_state.white_move and player_white) or (not game_state.white_move and player_black)
-        
+
+        is_human_turn = (game_state.white_move and player_white) or (
+            not game_state.white_move and player_black
+        )
+
         for event in pygame.event.get():
 
             # If quit
             if event.type == pygame.QUIT:
                 status = False
 
-            # If person clicks on a piece
+            # If user is scrolling
+            elif event.type == pygame.MOUSEWHEEL:
+                x_coordinate, _ = pygame.mouse.get_pos()
+                
+                # If user is scrolling at the move log area, scroll the area
+                if x_coordinate // SQUARE_SIZE >= 8:
+                    delta_y += event.y
+                    print(event.y)
+
+            # If person clicks somewhere
             elif event.type == pygame.MOUSEBUTTONDOWN:
 
                 if game_over or not is_human_turn:
@@ -64,7 +83,7 @@ def main() -> None:
                 row = coordinates[1] // SQUARE_SIZE
 
                 # If user has already selected the piece, unselect the piece
-                if square_selected == (row, column):
+                if square_selected == (row, column) or column >= 8:
                     square_selected = ()
                     piece_move = []
 
@@ -141,13 +160,15 @@ def main() -> None:
 
         # Calls the required chess engine
         if not game_over and not is_human_turn:
-            ai_move, ai_promotion_type, evaluation = chess_ai.negamax_ai(game_state, valid_moves, depth=3)
+            ai_move, ai_promotion_type, evaluation = chess_ai.negamax_ai(
+                game_state, valid_moves, depth=3
+            )
             game_state.make_move(ai_move, ai_promotion_type)
             print(f"move:{ai_move.get_chess_notation()}, evaluation: {evaluation}")
-            
+
             move_made = True
             animate = True
-        
+
         # IF move has been made, generate a list of all the valid moves
         if move_made:
             if animate:
@@ -164,17 +185,17 @@ def main() -> None:
             winner = {False: "white", True: "black"}
 
             (
-                draw_text(
+                draw_endgame_text(
                     screen, f"Checkmate, {winner[game_state.white_move]} won!"
                 )
                 if game_state.in_check
-                else draw_text(screen, "Stalemate")
+                else draw_endgame_text(screen, "Stalemate")
             )
             pygame.display.update()
             clock.tick(10)
-        
+
         else:
-            draw_board(screen, game_state, valid_moves, square_selected)
+            draw_board(screen, game_state, valid_moves, square_selected, move_log_font)
             clock.tick(30)
             pygame.display.flip()
 
@@ -218,6 +239,18 @@ def move_highlighting(
                         (move.end_column * SQUARE_SIZE, move.end_row * SQUARE_SIZE),
                     )
 
+    if game_state.move_log:
+        
+        # Highlight the last move
+        last_move = game_state.move_log[-1]
+        surface = pygame.Surface((SQUARE_SIZE, SQUARE_SIZE))
+        surface.set_alpha(100)
+        surface.fill(pygame.Color("yellow"))
+        
+        for square in last_move.move:
+            row, column = square
+            screen.blit(surface, (column * SQUARE_SIZE, row * SQUARE_SIZE))
+             
 
 def load_images() -> None:
     """
@@ -239,6 +272,7 @@ def draw_board(
     game_state: chess_logic.GameState,
     valid_moves: list,
     square_selected: tuple,
+    move_log_font: str,
 ) -> None:
     """
     Draws the board that gets displayed in pygame
@@ -248,10 +282,14 @@ def draw_board(
         game_state (chess_logic.GameState): The current game state
         valid_moves (list): List of valid moves in current position
         square_selected (tuple): The square selected by the user
+        move_log_font(str): Font of the move log
     """
+    global delta_y
+    
     draw_squares(screen)
     move_highlighting(screen, game_state, valid_moves, square_selected)
     draw_pieces(screen, game_state.board)
+    draw_move_log(screen, game_state, move_log_font, delta_y * 10)
 
 
 def draw_squares(screen: pygame.display) -> None:
@@ -284,7 +322,7 @@ def draw_squares(screen: pygame.display) -> None:
                     column * SQUARE_SIZE, row * SQUARE_SIZE, SQUARE_SIZE, SQUARE_SIZE
                 ),
             )
-
+            
 
 def draw_pieces(screen: pygame.display, board: chess_logic.GameState) -> None:
     """
@@ -309,6 +347,43 @@ def draw_pieces(screen: pygame.display, board: chess_logic.GameState) -> None:
                         SQUARE_SIZE,
                     ),
                 )
+
+
+def draw_move_log(
+    screen: pygame.display, game_state: chess_logic.GameState, move_log_font: str, delta_y: float
+) -> None:
+    """Draws the move log onto the screen"""
+    
+    # Draws a background to hold the move log
+    move_log_rect = pygame.Rect(WIDTH, 0, MOVE_LOG_WIDTH, HEIGHT)
+    pygame.draw.rect(screen, pygame.Color("black"), move_log_rect)
+    
+    # To hold the move log
+    move_log = game_state.move_log
+    move_texts = [move.get_pgn_chess_notation() for move in move_log]
+    
+    # Padding and line spacing for the moves
+    padding = 5
+    line_spacing = 17
+    
+    # x, y location of each text
+    text_x = padding
+    text_y = padding - line_spacing - delta_y
+    
+    for i, move_text in enumerate(move_texts):
+        
+        if not i % 2:
+            move_text = f"{int((i / 2) + 1)}. {move_text}"
+            text_y += line_spacing
+            
+            text_x = padding
+            
+        else:
+            text_x += 100
+        
+        text_object = move_log_font.render(move_text, 0, pygame.Color("white"))
+        text_location = move_log_rect.move(text_x, text_y)
+        screen.blit(text_object, text_location)
 
 
 def animate_moves(
@@ -347,13 +422,17 @@ def animate_moves(
         # Draw the piece that was captured back onto the square
         if move.piece_captured:
             if move.is_en_passant:
-                en_passant_row = (move.end_row - 1) if move.piece_moved[0] == "b" else (move.end_row + 1)
-                
+                en_passant_row = (
+                    (move.end_row - 1)
+                    if move.piece_moved[0] == "b"
+                    else (move.end_row + 1)
+                )
+
                 end_square = pygame.Rect(
-                move.end_column * square_size,
-                en_passant_row * square_size,
-                square_size,
-                square_size,
+                    move.end_column * square_size,
+                    en_passant_row * square_size,
+                    square_size,
+                    square_size,
                 )
             screen.blit(IMAGES[move.piece_captured], end_square)
 
@@ -417,7 +496,7 @@ def animate_moves(
         clock.tick(60)
 
 
-def draw_text(screen: pygame.display, text: str) -> None:
+def draw_endgame_text(screen: pygame.display, text: str) -> None:
     """Draws a text onto the screen"""
 
     font = pygame.font.SysFont("arial", 32, True, False)
@@ -427,6 +506,7 @@ def draw_text(screen: pygame.display, text: str) -> None:
         HEIGHT / 2 - (text_object.get_height() / 2),
     )
     screen.blit(text_object, text_location)
+
 
 if __name__ == "__main__":
     main()
