@@ -47,7 +47,7 @@ def main() -> None:
     game_over = False
 
     # Keeps track of if player is playing white and black
-    player_white, player_black = False, False
+    player_white, player_black = True, False
 
     while status:
 
@@ -160,7 +160,7 @@ def main() -> None:
         # Calls the required chess engine
         if not game_over and not is_human_turn:
             ai_move, ai_promotion_type, evaluation = chess_ai.negamax_ai(
-                game_state, valid_moves, depth=4
+                game_state, valid_moves, depth=3
             )
             game_state.make_move(ai_move, ai_promotion_type)
             print(f"move:{ai_move.get_chess_notation()}, evaluation: {evaluation}")

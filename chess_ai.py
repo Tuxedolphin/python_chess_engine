@@ -541,7 +541,6 @@ class peSTO_pst:
         # If it is a black piece, we need to swap the square and column to be from their perspective
         if colour == "b":
             row = 7 - row
-            column = 7 - column
 
         # Calculate middle game and endgame score
         mg_score = cls.mg_tables[piece_type][row][column] + cls.mg_values[piece_type]
