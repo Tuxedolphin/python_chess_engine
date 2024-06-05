@@ -294,7 +294,8 @@ def get_board_evaluation(game_state: GameState, valid_moves: list[Move]) -> floa
         else:
             return 0
 
-    # TODO: Checks for 3 fold repetition
+    if game_state.draw_log[-1].check_for_draw():
+        return 0
     
     # Calculates the evaluation of the position otherwise
     peSTO_evaluation = peSTO_pst.get_board_evaluation(game_state.board)

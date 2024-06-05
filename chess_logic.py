@@ -58,17 +58,9 @@ class GameState:
 
         # Keep track of both side's materials, both sides start off with 39 points of material
         self.white_material = self.black_material = 39
-
-        # Keep track of 3 fold repetition
-        self.past_boards = {
-            tuple(tuple(row) for row in copy.deepcopy(self.board)): 1,
-        }
-
-        # Keep track of 50 move rule
-        self.fifty_move_rule_counter = 0
-
-        # If either of the above is met, it is a draw
-        self.draw = False
+        
+        # Keeps track of the draw status of the board
+        self.draw_log = [DrawChecker(self.board, 0)]
 
     def make_move(self, move, promotion_type: str = "") -> None:
         """
@@ -78,12 +70,14 @@ class GameState:
             move (Move): A Move class of the move to be made
         """
 
+        # Keep track of if the 50 move rule has been reset
+        fifty_move_rule_reset = False
+        
         # Update location of pieces
         self.board[move.start_row][move.start_column] = ""
         self.board[move.end_row][move.end_column] = move.piece_moved
 
         self.move_log.append(move)
-        self.fifty_move_rule_counter += 1
 
         if move.piece_moved == "wK":
             self.white_king_location = (move.end_row, move.end_column)
@@ -93,8 +87,8 @@ class GameState:
 
         # If a piece was captured
         if move.piece_captured:
-
-            self.fifty_move_rule_counter = 0
+            
+            fifty_move_rule_reset = True
 
             # Get the value of the piece and subtract it from the player
             value = self.values[move.piece_captured[1]]
@@ -106,7 +100,7 @@ class GameState:
                 self.white_material -= value
 
         if move.piece_moved[1] == "p":
-            self.fifty_move_rule_counter = 0
+            fifty_move_rule_reset = True
 
         # If it is a pawn promotion
         if move.is_pawn_promotion:
@@ -161,24 +155,18 @@ class GameState:
         self.castle_rights_log.append(self.current_castle_rights.copy())
 
         self.white_move = not self.white_move
-
-        # Add board to past boards
-        self.past_boards[tuple(tuple(row) for row in copy.deepcopy(self.board))] = (
-            self.past_boards.get(
-                tuple(tuple(row) for row in copy.deepcopy(self.board)), 0
-            )
-            + 1
-        )
-
-        # Check if it is a draw
-        for count in self.past_boards.values():
-            if count >= 3:
-                self.draw = True
-                print("draw by repetition")
-
-        if self.fifty_move_rule_counter == 100:
-            print("fifty move rule")
-            self.draw = True
+        
+        if move.piece_moved[1] == "p":
+            fifty_move_rule_reset = True
+        
+        new_draw_checker = copy.deepcopy(self.draw_log[-1])
+        new_draw_checker.update_checker(self.board, 1)
+        
+        if fifty_move_rule_reset:
+            new_draw_checker.move_counter = 0
+        
+        self.draw_log.append(new_draw_checker)
+        
 
     def undo_move(self) -> None:
         """
@@ -240,6 +228,10 @@ class GameState:
 
                 else:
                     self.black_material -= 8
+                    
+            # Removes the last draw checker
+            self.draw_log.pop()
+            
 
     def get_valid_moves(self) -> list:
         """
@@ -1275,3 +1267,32 @@ class CastleRights:
 
     def __str__(self):
         return f"White: {self.white_king_side, self.white_queen_side}, Black: {self.black_king_side, self.black_queen_side}"
+
+
+class DrawChecker:
+    """
+    Keeps track of if the game state is a draw
+    """
+    
+    def __init__(self, board: list[list[str]], move_counter: int = 0) -> None:
+        
+        self.past_boards ={tuple(tuple(row) for row in board): 1}
+        
+        self.move_counter = move_counter
+        
+    def update_checker(self, board: list[list[str]], move_counter: int) -> None:
+        
+        self.past_boards[tuple(tuple(row) for row in board)] = self.past_boards.get(tuple(tuple(row) for row in board), 0) + 1
+
+        self.move_counter += move_counter
+    
+    def check_for_draw(self) -> bool:
+        
+        for count in self.past_boards.values():
+            if count >= 3:
+                return True
+            
+        if self.move_counter == 100:
+            return True
+        
+        return False

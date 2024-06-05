@@ -47,7 +47,7 @@ def main() -> None:
     game_over = False
 
     # Keeps track of if player is playing white and black
-    player_white, player_black = False, True
+    player_white, player_black = False, False
 
     while status:
 
@@ -177,12 +177,12 @@ def main() -> None:
             move_made = False
 
             # Test for checkmate and stalemate
-            if not valid_moves or game_state.draw:
+            if not valid_moves or game_state.draw_log[-1].check_for_draw():
                 game_over = True
 
         if game_over:
             
-            if game_state.draw:
+            if game_state.draw_log[-1].check_for_draw():
                 draw_endgame_text(screen, f"Draw!")
             
             else:
