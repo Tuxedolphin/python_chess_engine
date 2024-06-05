@@ -39,7 +39,7 @@ def main() -> None:
     game_over = False
 
     # Keeps track of if player is playing white and black
-    player_white, player_black = True, False
+    player_white, player_black = True, True
 
     while status:
         
@@ -346,6 +346,15 @@ def animate_moves(
 
         # Draw the piece that was captured back onto the square
         if move.piece_captured:
+            if move.is_en_passant:
+                en_passant_row = (move.end_row - 1) if move.piece_moved[0] == "b" else (move.end_row + 1)
+                
+                end_square = pygame.Rect(
+                move.end_column * square_size,
+                en_passant_row * square_size,
+                square_size,
+                square_size,
+                )
             screen.blit(IMAGES[move.piece_captured], end_square)
 
         # If the move is a castle, need to animate the rook as well

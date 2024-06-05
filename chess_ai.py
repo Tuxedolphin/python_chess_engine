@@ -176,6 +176,10 @@ def negamax_ai(
     """
     A negamax AI which has a much more complex evaluation function, did not make use of copy
     """
+    
+    global counter
+    
+    counter = 0
 
     # To hold the max score among the moves
     max_evaluation = -100000
@@ -193,9 +197,10 @@ def negamax_ai(
             game_state.make_move(move)
 
         next_valid_moves = game_state.get_valid_moves()
+        counter += 1
 
         evaluation = -get_negamax_evaluation(
-            game_state, next_valid_moves, depth - 1, -turn_multiplier
+            game_state, next_valid_moves, depth - 1, -turn_multiplier, -100000, 100000
         )
 
         # Compare the evaluations, we do not need to call the function since we only check for max
@@ -208,20 +213,30 @@ def negamax_ai(
 
         game_state.undo_move()
 
+    print(f"Positions searched: {counter}")
     return return_move(return_random_move(best_net_moves), max_evaluation)
 
 
 def get_negamax_evaluation(
-    game_state: GameState, valid_moves: list[Move], depth: int, turn_multiplier: int, alpha: float, beta: float
+    game_state: GameState,
+    valid_moves: list[Move],
+    depth: int,
+    turn_multiplier: int,
+    alpha: float,
+    beta: float,
 ) -> float:
     """
     Returns the evaluation of a given position using the negamax algorithm
-    
+
     Alpha beta pruning used.
     """
 
+    global counter
+
     if not depth:
         return turn_multiplier * get_board_evaluation(game_state, valid_moves)
+
+    # TODO: Move ordering - find moves that are better (check and captures first)
 
     max_evaluation = -100000
 
@@ -233,9 +248,10 @@ def get_negamax_evaluation(
             game_state.make_move(move)
 
         next_valid_moves = game_state.get_valid_moves()
+        counter += 1
 
         evaluation = -get_negamax_evaluation(
-            game_state, next_valid_moves, depth - 1, -turn_multiplier
+            game_state, next_valid_moves, depth - 1, -turn_multiplier, -beta, -alpha
         )
 
         if evaluation > max_evaluation:
@@ -243,13 +259,19 @@ def get_negamax_evaluation(
 
         game_state.undo_move()
 
+        # Pruning - as long as the eval is greater than the upper bound, we are going to choose that tree
+        if max_evaluation > alpha:
+            alpha = max_evaluation
+
+        if alpha >= beta:
+            break
     return max_evaluation
 
 
 def get_board_evaluation(game_state: GameState, valid_moves: list[Move]) -> float:
     """
-    Returns the board evaluation, with a larger number being better 
-    
+    Returns the board evaluation, with a larger number being better for white and vice versa
+
     Factors considered:
     1) Is the position checkmate or stalemate
     2) Material count
@@ -263,7 +285,10 @@ def get_board_evaluation(game_state: GameState, valid_moves: list[Move]) -> floa
         else:
             return 0
 
-    return game_state.white_material - game_state.black_material
+    # Calculates the evaluation of the position otherwise
+    material_count = game_state.white_material - game_state.black_material
+
+    return material_count
 
 
 def compare_evaluations(

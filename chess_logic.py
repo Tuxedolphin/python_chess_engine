@@ -55,7 +55,7 @@ class GameState:
         self.current_castle_rights = CastleRights(True, True, True, True)
         self.castle_rights_log = [self.current_castle_rights.copy()]
         
-        # Keep track of both side's materials
+        # Keep track of both side's materials, both sides start off with 39 points of material
         self.white_material = self.black_material = 39
 
     def make_move(self, move, promotion_type: str = "") -> None:
