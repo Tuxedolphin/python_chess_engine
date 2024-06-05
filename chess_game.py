@@ -47,7 +47,7 @@ def main() -> None:
     game_over = False
 
     # Keeps track of if player is playing white and black
-    player_white, player_black = True, False
+    player_white, player_black = False, True
 
     while status:
 
@@ -68,7 +68,6 @@ def main() -> None:
                 # If user is scrolling at the move log area, scroll the area
                 if x_coordinate // SQUARE_SIZE >= 8:
                     delta_y += event.y
-                    print(event.y)
 
             # If person clicks somewhere
             elif event.type == pygame.MOUSEBUTTONDOWN:
@@ -161,7 +160,7 @@ def main() -> None:
         # Calls the required chess engine
         if not game_over and not is_human_turn:
             ai_move, ai_promotion_type, evaluation = chess_ai.negamax_ai(
-                game_state, valid_moves, depth=3
+                game_state, valid_moves, depth=4
             )
             game_state.make_move(ai_move, ai_promotion_type)
             print(f"move:{ai_move.get_chess_notation()}, evaluation: {evaluation}")
@@ -169,7 +168,7 @@ def main() -> None:
             move_made = True
             animate = True
 
-        # IF move has been made, generate a list of all the valid moves
+        # If move has been made, generate a list of all the valid moves
         if move_made:
             if animate:
                 animate_moves(game_state.move_log[-1], screen, game_state.board, clock)
@@ -178,19 +177,24 @@ def main() -> None:
             move_made = False
 
             # Test for checkmate and stalemate
-            if not valid_moves:
+            if not valid_moves or game_state.draw:
                 game_over = True
 
         if game_over:
-            winner = {False: "white", True: "black"}
+            
+            if game_state.draw:
+                draw_endgame_text(screen, f"Draw!")
+            
+            else:
+                winner = {False: "white", True: "black"}
 
-            (
-                draw_endgame_text(
-                    screen, f"Checkmate, {winner[game_state.white_move]} won!"
+                (
+                    draw_endgame_text(
+                        screen, f"Checkmate, {winner[game_state.white_move]} won!"
+                    )
+                    if game_state.in_check
+                    else draw_endgame_text(screen, "Stalemate")
                 )
-                if game_state.in_check
-                else draw_endgame_text(screen, "Stalemate")
-            )
             pygame.display.update()
             clock.tick(10)
 

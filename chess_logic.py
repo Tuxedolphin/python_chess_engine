@@ -14,8 +14,9 @@ class GameState:
         "N": 3,
         "p": 1,
         "promotion": 8,
+        "K": 10000,
     }
-    
+
     def __init__(self) -> None:
 
         # Generates a list of list which represents the initial board state
@@ -54,9 +55,20 @@ class GameState:
         # Keep track of castling rights
         self.current_castle_rights = CastleRights(True, True, True, True)
         self.castle_rights_log = [self.current_castle_rights.copy()]
-        
+
         # Keep track of both side's materials, both sides start off with 39 points of material
         self.white_material = self.black_material = 39
+
+        # Keep track of 3 fold repetition
+        self.past_boards = {
+            tuple(tuple(row) for row in copy.deepcopy(self.board)): 1,
+        }
+
+        # Keep track of 50 move rule
+        self.fifty_move_rule_counter = 0
+
+        # If either of the above is met, it is a draw
+        self.draw = False
 
     def make_move(self, move, promotion_type: str = "") -> None:
         """
@@ -71,45 +83,50 @@ class GameState:
         self.board[move.end_row][move.end_column] = move.piece_moved
 
         self.move_log.append(move)
+        self.fifty_move_rule_counter += 1
 
         if move.piece_moved == "wK":
             self.white_king_location = (move.end_row, move.end_column)
 
         elif move.piece_moved == "bK":
             self.black_king_location = (move.end_row, move.end_column)
-        
+
         # If a piece was captured
         if move.piece_captured:
-            
+
+            self.fifty_move_rule_counter = 0
+
             # Get the value of the piece and subtract it from the player
             value = self.values[move.piece_captured[1]]
-            
+
             if self.white_move:
                 self.black_material -= value
-            
+
             else:
                 self.white_material -= value
-        
+
+        if move.piece_moved[1] == "p":
+            self.fifty_move_rule_counter = 0
+
         # If it is a pawn promotion
         if move.is_pawn_promotion:
             self.board[move.end_row][move.end_column] = (
                 move.piece_moved[0] + promotion_type
             )
-            
+
             # Update the material count
             # TODO: Update to ensure that other possible promotion types are accounted for
             if self.white_move:
                 self.white_material += 8
-            
+
             else:
                 self.black_material += 8
-        
+
         # En passant
         elif move.is_en_passant:
 
             # Capture the pawn
             self.board[move.start_row][move.end_column] = ""
-
 
         # Check and update for squares where en passant is possible
         if move.piece_moved[1] == "p" and abs(move.start_row - move.end_row) == 2:
@@ -142,8 +159,26 @@ class GameState:
             self.current_castle_rights.update_castle_rights(move)
 
         self.castle_rights_log.append(self.current_castle_rights.copy())
-        
+
         self.white_move = not self.white_move
+
+        # Add board to past boards
+        self.past_boards[tuple(tuple(row) for row in copy.deepcopy(self.board))] = (
+            self.past_boards.get(
+                tuple(tuple(row) for row in copy.deepcopy(self.board)), 0
+            )
+            + 1
+        )
+
+        # Check if it is a draw
+        for count in self.past_boards.values():
+            if count >= 3:
+                self.draw = True
+                print("draw by repetition")
+
+        if self.fifty_move_rule_counter == 100:
+            print("fifty move rule")
+            self.draw = True
 
     def undo_move(self) -> None:
         """
@@ -188,21 +223,21 @@ class GameState:
                     move.end_row
                 ][move.end_column + 1]
                 self.board[move.end_row][move.end_column + 1] = ""
-                
+
             # Undoing the material count
             if move.piece_captured:
                 value = self.values[move.piece_captured[1]]
-                
+
                 if self.white_move:
                     self.black_material += value
-                    
+
                 else:
                     self.white_material += value
-                    
+
             if move.is_pawn_promotion:
                 if self.white_move:
                     self.white_material -= 8
-                    
+
                 else:
                     self.black_material -= 8
 
@@ -507,6 +542,9 @@ class GameState:
         # For white pawns
         if self.white_move:
 
+            # Keep rack of king location due to weird en passant bug
+            king_row, king_column = self.white_king_location
+
             # Check if square in front is empty and not pinned (but moving in direction of pin is fine)
             if not self.board[row - 1][column]:
                 if not piece_pinned or pin_direction == (-1, 0):
@@ -515,7 +553,9 @@ class GameState:
                     # If it is on starting row, check if the 2nd square in front is empty
                     if row == 6:
                         if not self.board[row - 2][column]:
-                            moves.append(Move((row, column), (row - 2, column), self.board))
+                            moves.append(
+                                Move((row, column), (row - 2, column), self.board)
+                            )
 
             # Check for captures
 
@@ -533,10 +573,42 @@ class GameState:
 
                 # If it is empty, check if it is the square where en passant is possible
                 elif (row - 1, column - 1) == self.en_passant_square:
+
                     if not piece_pinned or pin_direction == (-1, -1):
-                        moves.append(
-                            Move((row, column), (row - 1, column - 1), self.board, True)
-                        )
+
+                        # Fixing weird en passant bug
+                        attacking_piece = blocking_piece = None
+                        if king_row == row and row == 3:
+                            if king_column < column:
+                                inside_range = range(king_column + 1, column - 1)
+                                outside_range = range(column + 1, 8)
+
+                            else:
+                                inside_range = range(king_column - 1, column, -1)
+                                outside_range = range(column - 2, -1, -1)
+
+                            for i in inside_range:
+                                if piece := self.board[row][i]:
+                                    blocking_piece = piece
+
+                            for i in outside_range:
+                                square = self.board[row][i]
+                                if square.startswith("b"):
+                                    if square[1] == "R" or square[1] == "Q":
+                                        attacking_piece = square[1]
+
+                                elif square:
+                                    blocking_piece = square
+
+                        if not attacking_piece or blocking_piece:
+                            moves.append(
+                                Move(
+                                    (row, column),
+                                    (row - 1, column - 1),
+                                    self.board,
+                                    True,
+                                )
+                            )
 
             # If can capture to right
             if column + 1 < self.dimensions:
@@ -552,12 +624,46 @@ class GameState:
 
                 elif (row - 1, column + 1) == self.en_passant_square:
                     if not piece_pinned or pin_direction == (-1, 1):
-                        moves.append(
-                            Move((row, column), (row - 1, column + 1), self.board, True)
-                        )
+
+                        # Fixing weird en passant bug
+                        attacking_piece = blocking_piece = None
+                        if king_row == row and row == 3:
+                            if king_column < column:
+                                inside_range = range(king_column + 1, column)
+                                outside_range = range(column + 2, 8)
+
+                            else:
+                                inside_range = range(king_column - 1, column + 1, -1)
+                                outside_range = range(column - 1, -1, -1)
+
+                            for i in inside_range:
+                                if piece := self.board[row][i]:
+                                    blocking_piece = piece
+
+                            for i in outside_range:
+                                square = self.board[row][i]
+                                if square.startswith("b"):
+                                    if square[1] == "R" or square[1] == "Q":
+                                        attacking_piece = square[1]
+
+                                elif square:
+                                    blocking_piece = square
+
+                        if not attacking_piece or blocking_piece:
+                            moves.append(
+                                Move(
+                                    (row, column),
+                                    (row - 1, column + 1),
+                                    self.board,
+                                    True,
+                                )
+                            )
 
         # For black pawns
         else:
+
+            # Get king square to fix weird en passant bug
+            king_row, king_column = self.black_king_location
 
             if not self.board[row + 1][column]:
 
@@ -567,7 +673,9 @@ class GameState:
 
                     if row == 1:
                         if not self.board[row + 2][column]:
-                            moves.append(Move((row, column), (row + 2, column), self.board))
+                            moves.append(
+                                Move((row, column), (row + 2, column), self.board)
+                            )
 
             if column - 1 >= 0:
 
@@ -579,9 +687,40 @@ class GameState:
 
                 elif (row + 1, column - 1) == self.en_passant_square:
                     if not piece_pinned or pin_direction == (1, -1):
-                        moves.append(
-                            Move((row, column), (row + 1, column - 1), self.board, True)
-                        )
+
+                        # Fixing weird en passant bug
+                        attacking_piece = blocking_piece = None
+                        if king_row == row and row == 4:
+                            if king_column < column:
+                                inside_range = range(king_column + 1, column - 1)
+                                outside_range = range(column + 1, 8)
+
+                            else:
+                                inside_range = range(king_column - 1, column, -1)
+                                outside_range = range(column - 2, -1, -1)
+
+                            for i in inside_range:
+                                if piece := self.board[row][i]:
+                                    blocking_piece = piece
+
+                            for i in outside_range:
+                                square = self.board[row][i]
+                                if square.startswith("w"):
+                                    if square[1] == "R" or square[1] == "Q":
+                                        attacking_piece = square[1]
+
+                                elif square:
+                                    blocking_piece = square
+
+                        if not attacking_piece or blocking_piece:
+                            moves.append(
+                                Move(
+                                    (row, column),
+                                    (row + 1, column - 1),
+                                    self.board,
+                                    True,
+                                )
+                            )
 
             if column + 1 < self.dimensions:
 
@@ -593,9 +732,40 @@ class GameState:
 
                 elif (row + 1, column + 1) == self.en_passant_square:
                     if not piece_pinned or pin_direction == (1, 1):
-                        moves.append(
-                            Move((row, column), (row + 1, column + 1), self.board, True)
-                        )
+
+                        # Fixing weird en passant bug
+                        attacking_piece = blocking_piece = None
+                        if king_row == row and row == 4:
+                            if king_column < column:
+                                inside_range = range(king_column + 1, column)
+                                outside_range = range(column + 2, 8)
+
+                            else:
+                                inside_range = range(king_column - 1, column + 1, -1)
+                                outside_range = range(column - 1, -1, -1)
+
+                            for i in inside_range:
+                                if piece := self.board[row][i]:
+                                    blocking_piece = piece
+
+                            for i in outside_range:
+                                square = self.board[row][i]
+                                if square.startswith("w"):
+                                    if square[1] == "R" or square[1] == "Q":
+                                        attacking_piece = square[1]
+
+                                elif square:
+                                    blocking_piece = square
+
+                        if not attacking_piece or blocking_piece:
+                            moves.append(
+                                Move(
+                                    (row, column),
+                                    (row + 1, column + 1),
+                                    self.board,
+                                    True,
+                                )
+                            )
 
     def get_rook_moves(self, row: int, column: int, moves: list) -> None:
         """Appends to list all of the rook moves"""
@@ -959,9 +1129,10 @@ class Move:
         if self.queen_side_castle:
             return "O-O-O"
 
-        return self.get_rank_file(self.start_row, self.start_column
+        return self.get_rank_file(
+            self.start_row, self.start_column
         ) + self.get_rank_file(self.end_row, self.end_column)
-        
+
     def get_pgn_chess_notation(self) -> str:
         """
         Returns a string of the pgn notation of a chess notation of the move.
@@ -970,29 +1141,33 @@ class Move:
         Returns:
             str: the chess notation
         """
-        
+
         if self.king_side_castle:
             return "O-O"
 
         if self.queen_side_castle:
             return "O-O-O"
-        
+
         piece_captured = ""
-        
+
         end_square = self.get_rank_file(self.end_row, self.end_column)
-        
+
         if self.piece_captured:
             piece_captured = "x"
-        
+
         if self.piece_moved[1] == "p":
             if self.piece_captured:
-                return self.columns_to_files[self.start_column] + piece_captured + end_square
-            
+                return (
+                    self.columns_to_files[self.start_column]
+                    + piece_captured
+                    + end_square
+                )
+
             return self.get_rank_file(self.end_row, self.end_column)
-        
+
         else:
             return self.piece_moved[1] + piece_captured + end_square
-        
+
     def get_rank_file(self, row: int, column: int) -> str:
         """
         Returns the chess notation of the required row and column
@@ -1008,6 +1183,7 @@ class Move:
 
     def __str__(self):
         return self.get_chess_notation()
+
 
 class CastleRights:
 
