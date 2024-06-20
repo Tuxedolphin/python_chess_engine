@@ -1,6 +1,6 @@
 import pygame
-import chess_logic
-import chess_ai
+from python_chess import chess_logic
+from python_chess import chess_ai
 
 
 WIDTH = HEIGHT = 512  # For dimensions of board

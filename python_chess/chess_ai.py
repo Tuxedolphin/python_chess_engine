@@ -1,4 +1,4 @@
-from chess_logic import *
+from .chess_logic import *
 import random
 import copy
 
