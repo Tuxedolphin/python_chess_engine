@@ -93,8 +93,8 @@ def simple_materialistic_ai(valid_moves: list) -> Move:
 
 
 def materialistic_minimax_ai(
-    valid_moves: list[Move],
     game_state: GameState,
+    valid_moves: list[Move],
     depth: int = 2,
     current_depth: int = 0,
 ) -> tuple[Move, str, int]:
@@ -151,8 +151,8 @@ def materialistic_minimax_ai(
             else:
                 # Call recursion to get the evaluation for every move
                 _, _, evaluation = materialistic_minimax_ai(
-                    copied_valid_moves,
                     copied_game_state,
+                    copied_valid_moves,
                     depth,
                     current_depth=current_depth,
                 )
