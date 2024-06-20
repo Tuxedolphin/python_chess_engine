@@ -1,4 +1,5 @@
 import pygame
+import sys
 from python_chess import chess_logic
 from python_chess import chess_ai
 
@@ -8,13 +9,105 @@ MOVE_LOG_WIDTH = 250 # For dimensions of move log window
 DIMENSION = 8  # The dimensions of a chess board
 SQUARE_SIZE = HEIGHT // DIMENSION  # Getting the integer size of the square
 IMAGES = {}
+X_CENTER = (WIDTH + MOVE_LOG_WIDTH) // 2 # Gets the horizontal center of the screen
+Y_CENTER = (HEIGHT // 2) # Gets the vertical center of the screen
 
+pygame.init() #Initialise pygame
 
 def main() -> None:
-    pygame.init()
     screen = pygame.display.set_mode((WIDTH + MOVE_LOG_WIDTH, HEIGHT))
     clock = pygame.time.Clock()
     screen.fill(pygame.Color("white"))
+    
+    main_menu(screen, clock)
+    
+
+def main_menu(screen: pygame.display, clock:pygame.time) -> None:
+    """ Main menu of the application """
+    
+    pygame.display.set_caption("Menu")
+    screen.fill(pygame.Color("white"))
+    
+    menu_font = pygame.font.SysFont("arial", 30, False, False)
+    menu_text = menu_font.render("Main Menu", True, pygame.Color("black"))
+    
+    menu_text_rect = menu_text.get_rect()
+    menu_text_rect.center = (X_CENTER, Y_CENTER - 200)
+    
+    play_button = Button(None, (X_CENTER, Y_CENTER - 100), "PLAY", menu_font, pygame.Color("black"), pygame.Color("gray"))
+    options_button = Button(None, (X_CENTER, Y_CENTER), "OPTIONS", menu_font, pygame.Color("black"), pygame.Color("gray"))
+    quit_button = Button(None, (X_CENTER, Y_CENTER + 100), "QUIT", menu_font, pygame.Color("black"), pygame.Color("gray"))
+    
+    while True:
+        menu_mouse_pos = pygame.mouse.get_pos()
+        screen.blit(menu_text, menu_text_rect)
+        
+        # Updates the button should the user hover over it
+        for button in [play_button, options_button, quit_button]:
+            button.change_colour(menu_mouse_pos)
+            button.update(screen)
+            
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+                
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if play_button.check_for_input(menu_mouse_pos):
+                    play_screen(screen, clock)
+                
+                elif options_button.check_for_input(menu_mouse_pos):
+                    options_screen(screen, clock)
+                    
+                elif quit_button.check_for_input(menu_mouse_pos):
+                    pygame.quit()
+                    sys.exit()
+                    
+        pygame.display.update()
+                
+    
+def options_screen(screen, clock) -> None:
+    ...
+    
+    
+class Button:
+    
+    def __init__(self, image, pos, text_input, font, base_colour, hovering_colour) -> None:
+        """ Initialise the button class with the basic criteria """
+        self.image = image
+        self.x_pos = pos[0]
+        self.y_pos = pos[1]
+        self.font = font
+        self.base_colour, self.hovering_colour = base_colour, hovering_colour
+        self.text_input = text_input
+        self.text = self.font.render(self.text_input, True, self.base_colour)
+        if not self.image:
+            self.image = self.text
+        self.rect = self.image.get_rect(center = (self.x_pos, self.y_pos))
+        self.text_rect = self.text.get_rect(center = (self.x_pos, self.y_pos))
+        
+    def update(self, screen) -> None:
+        """ Places text/ image on screen """
+        if self.image:
+            screen.blit(self.image, self.rect)
+        screen.blit(self.text, self.text_rect)
+        
+    def check_for_input(self, position) -> bool:
+        """ Checks if the user has clicked on the button """
+        
+        return (position[0] in range(self.rect.left, self.rect.right) and position[1] in range(self.rect.top, self.rect.bottom))
+
+    def change_colour(self, position) -> None:
+        """ Changes colour of the button if the user is hovering over the button """
+        if self.check_for_input(position):
+            self.text = self.font.render(self.text_input, True, self.hovering_colour)
+        else:
+            self.text = self.font.render(self.text_input, True, self.base_colour)
+
+def play_screen(screen: pygame.display, clock:pygame.time) -> None:
+    """ The main game screen of the application """
+
+    pygame.display.set_caption("Play Chess")
 
     game_state = chess_logic.GameState()
     load_images()
@@ -25,8 +118,6 @@ def main() -> None:
     # To keep track of how much the user has scrolled the move log
     global delta_y
     delta_y = 0
-
-    status = True
 
     # Gets the square that the user has selected
     square_selected = ()
@@ -49,7 +140,7 @@ def main() -> None:
     # Keeps track of if player is playing white and black
     player_white, player_black = True, False
 
-    while status:
+    while True:
 
         is_human_turn = (game_state.white_move and player_white) or (
             not game_state.white_move and player_black
@@ -59,7 +150,7 @@ def main() -> None:
 
             # If quit
             if event.type == pygame.QUIT:
-                status = False
+                sys.exit()
 
             # If user is scrolling
             elif event.type == pygame.MOUSEWHEEL:
