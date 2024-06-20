@@ -12,10 +12,24 @@ IMAGES = {}
 X_CENTER = (WIDTH + MOVE_LOG_WIDTH) // 2  # Gets the horizontal center of the screen
 Y_CENTER = HEIGHT // 2  # Gets the vertical center of the screen
 
+# Integers corresponding to the AIs
+AI = {
+    1: chess_ai.random_move_ai,
+    2: chess_ai.simple_materialistic_ai,
+    3: chess_ai.materialistic_minimax_ai,
+    4: chess_ai.negamax_ai,
+}
+
 pygame.init()  # Initialise pygame
 
 
 def main() -> None:
+    
+    # Default AI is the negamax AI at depth 3 ply
+    global ai
+    global depth
+    ai, depth = 4, 3
+    
     screen = pygame.display.set_mode((WIDTH + MOVE_LOG_WIDTH, HEIGHT))
     clock = pygame.time.Clock()
     screen.fill(pygame.Color("white"))
@@ -82,7 +96,31 @@ def main() -> None:
         pygame.display.update()
 
 
-def options_screen(screen, clock) -> None: ...
+def options_screen(screen, clock) -> None:
+    """ The options menu, where users choose the AI and depth """
+    
+    pygame.display.set_caption("Options")
+    options_font = pygame.font.SysFont("arial", 25, False, False)
+    back_button = Button(None, (X_CENTER, HEIGHT - 30), "Back", options_font, pygame.Color("black"), pygame.Color("gray"))
+    
+    while True:
+        mouse_pos = pygame.mouse.get_pos()
+        
+        screen.fill(pygame.Color("white"))
+                
+        back_button.change_colour(mouse_pos)
+        back_button.update(screen)
+        
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if back_button.check_for_input(mouse_pos):
+                    main()
+            
+        pygame.display.update()
 
 
 class Button:
