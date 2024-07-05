@@ -2,7 +2,12 @@
 #include "chess_logic.h"
 
 // Prints the current bitboard into the terminal as a 2 dimensional array
-void GameState::print_board() {
+void GameState::print_board(bitboard board /*= 0ULL*/) {
+
+    if (board == 0ULL) {
+        board = this->board;
+    }
+
     for (int rank = 0; rank < 8; ++rank) {
         for (int file = 0; file < 8; ++file) {
             int square { rank * 8 + file };
@@ -20,7 +25,7 @@ void GameState::print_board() {
     cout << "\n     a b c d e f g h\n";
 
     // Print the bit
-    cout << "     Bitboard: " << board; 
+    cout << "     Bitboard: " << board << '\n'; 
 }
 
 // Updates the bitboard

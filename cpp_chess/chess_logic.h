@@ -5,22 +5,32 @@
 #include <iostream>
 #include <string>
 #include <string_view>
+#include <array>
 
 using namespace std::literals;
+using std::array;
 using std::cout;
 
+using bitboard = uint64_t;
+
 // Define inline functions for accessing bits
-inline int get_bit(const uint64_t &board, int square) {
+
+// Getting the bit at the square location
+inline int get_bit(const bitboard &board, int square) {
     return (board & (1ULL << square) ? 1 : 0);
 }
-inline void set_bit(uint64_t &board, int square) {
+
+// Setting the bit at the square to be 1
+inline void set_bit(bitboard &board, int square) {
     board |= (1ULL << square);
 }
-inline void remove_bit(uint64_t &board, int square) {
+
+// Setting the bit at the square to be 0 
+inline void remove_bit(bitboard &board, int square) {
     ((1ULL << square) ? 1 : 0) ? board ^= (1ULL, square) : 0;
 }
 
-// Define board pieces
+// Define board squares
 enum Squares {
     a8, b8, c8, d8, e8, f8, g8, h8,
     a7, b7, c7, d7, e7, f7, g7, h7,
@@ -35,7 +45,16 @@ enum Squares {
 // Define the type of pieces
 enum class Pieces {
     empty,
+    pawn,
+    bishop,
+    knight,
+    rook,
+    queen,
+    king,
+};
 
+enum SideToMove {
+    white, black,
 };
 
 #endif
