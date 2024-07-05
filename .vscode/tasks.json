@@ -9,6 +9,7 @@
                 "-g",
                 "chess_ai.cpp",
                 "GameState.cpp",
+                "generate_moves.cpp",
                 "-o",
                 "chess_main.exe"
             ],
