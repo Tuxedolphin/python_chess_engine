@@ -8,9 +8,9 @@
                 "-fdiagnostics-color=always",
                 "-g",
                 "chess_ai.cpp",
-                "chess_logic.cpp",
+                "GameState.cpp",
                 "-o",
-                "${fileDirname}\\${fileBasenameNoExtension}.exe"
+                "chess_main.exe"
             ],
             "options": {
                 "cwd": "${fileDirname}"
