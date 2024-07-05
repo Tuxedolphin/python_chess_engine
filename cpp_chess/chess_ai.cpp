@@ -1,20 +1,26 @@
+#include "GameState.h"
 #include "chess_logic.h"
 
-int side2move;
-int board[64];
+bool convert_fen(const std::string_view fen);
 
 int main(int argc, char *argv[]) {
 
-    uint64_t bitboard = 0ULL;
-    print_bitboard(bitboard);
+    GameState game_state {};
+    game_state.update_board(1, h7);
+    game_state.print_board();
+    
+    cout << '\n';
+
+    game_state.update_board(2, h7);
+    game_state.print_board();
 
     return 0;
 }
 
-bool convert_fen(char *fen) {
+bool convert_fen(const std::string_view fen) {
     // Takes as input a fen and returns a bitwise map of the board
 
-    uint64_t bitboard;
+    uint64_t bitboard {};
     return true;
 
 }
