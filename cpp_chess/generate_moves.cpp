@@ -17,6 +17,9 @@ const bitboardMapTable& knight_attacks {knight_attacks_map};
 bitboardMapTable king_attacks_map {};
 const bitboardMapTable& king_attacks {king_attacks_map};
 
+bitboardMapTable bishop_attacks_map {};
+const bitboardMapTable& bishop_attacks {bishop_attacks_map};
+
 /* Attacks using the pawn is generated using a pawn attack table */
 
 constexpr bitboard not_A_file { 18374403900871474942ULL };
@@ -94,10 +97,126 @@ bitboard generate_king_attacks(int square) {
     if ((board << 7) & not_H_file) king_attacks |= (board << 7);
     if ((board << 1) & not_A_file) king_attacks |= (board << 1);
 
-
-
     return king_attacks;
 
+}
+
+// Generates all the squares that the bishop attacks, ignoring all pieces
+bitboard generate_all_bishop_attacks(int square) {
+    
+    bitboard attacks { 0ULL };
+
+    // To calculate the next square in the slider piece
+    int target_rank { square / 8 };
+    int target_file { square % 8 };
+
+    // Generate the squares attacked by the bishop in each direction (ignoring the outer ranks/ files)
+    for (int rank = target_rank + 1, file = target_file + 1; rank <= 6 && file <= 6; ++rank, ++file) {
+        attacks |= (1ULL << (rank * 8 + file));
+    }
+    for (int rank = target_rank - 1, file = target_file + 1; rank >= 1 && file <= 6; --rank, ++file) {
+        attacks |= (1ULL << (rank * 8 + file));
+    }
+    for (int rank = target_rank + 1, file = target_file - 1; rank <= 6 && file >= 1; ++rank, --file) {
+        attacks |= (1ULL << (rank * 8 + file));
+    }
+    for (int rank = target_rank - 1, file = target_file - 1; rank >= 1 && file >= 1; --rank, --file) {
+        attacks |= (1ULL << (rank * 8 + file));
+    }
+
+    return attacks;
+}
+
+// Generates all the squares that the rook attacks, ignoring all pieces
+bitboard generate_all_rook_attacks(int square) {
+
+    bitboard attacks { 0ULL };
+
+    // To calculate the next square in the slider piece
+    int target_rank { square / 8 };
+    int target_file { square % 8 };
+
+    // Generate the squares attacked by the bishop in each direction (ignoring the outer ranks/ files)
+    for (int rank = target_rank + 1; rank <= 6; ++rank) {
+        attacks |= (1ULL << rank * 8 + target_file);
+    }
+    for (int rank = target_rank - 1; rank >= 1; --rank) {
+        attacks |= (1ULL << rank * 8 + target_file);
+    }
+    for (int file = target_file + 1; file <= 6; ++file) {
+        attacks |= (1ULL << target_rank * 8 + file);
+    }
+    for (int file = target_file - 1; file >= 1; --file) {
+        attacks |= (1ULL << target_rank * 8 + file);
+    }
+
+    return attacks;
+}
+
+// Checks if the current square already has a piece on it
+inline bool check_for_blocker(int square, bitboard occupied_squares) {
+    return ((1ULL << square) & occupied_squares);
+}
+
+// Generates the squares that the bishop attacks, including the square which is occupied
+bitboard generate_bishop_attacks(int square, bitboard occupied_squares) {
+    
+    bitboard attacks { 0ULL };
+
+    // To calculate the next square in the slider piece
+    int target_rank { square / 8 };
+    int target_file { square % 8 };
+
+    // Generate the squares attacked by the bishop in each direction
+    for (int rank = target_rank + 1, file = target_file + 1; rank <= 7 && file <= 7; ++rank, ++file) {
+        attacks |= (1ULL << (rank * 8 + file));
+        if (check_for_blocker(rank * 8 + file, occupied_squares)) break;
+    }
+    for (int rank = target_rank - 1, file = target_file + 1; rank >= 0 && file <= 7; --rank, ++file) {
+        attacks |= (1ULL << (rank * 8 + file));
+        if (check_for_blocker(rank * 8 + file, occupied_squares)) break;
+
+    }
+    for (int rank = target_rank + 1, file = target_file - 1; rank <= 7 && file >= 0; ++rank, --file) {
+        attacks |= (1ULL << (rank * 8 + file));
+        if (check_for_blocker(rank * 8 + file, occupied_squares)) break;
+    }
+    for (int rank = target_rank - 1, file = target_file - 1; rank >= 0 && file >= 0; --rank, --file) {
+        attacks |= (1ULL << (rank * 8 + file));
+        if (check_for_blocker(rank * 8 + file, occupied_squares)) break;
+    }
+
+    return attacks;
+}
+
+// Generates all the squares that the rook attacks, including the square which is occupied
+bitboard generate_rook_attacks(int square, bitboard occupied_squares) {
+
+    bitboard attacks { 0ULL };
+
+    // To calculate the next square in the slider piece
+    int target_rank { square / 8 };
+    int target_file { square % 8 };
+
+    // Generate the squares attacked by the bishop in each direction
+    for (int rank = target_rank + 1; rank <= 7; ++rank) {
+        attacks |= (1ULL << rank * 8 + target_file);
+        if (check_for_blocker(rank * 8 + target_file, occupied_squares)) break;
+    }
+    for (int rank = target_rank - 1; rank >= 0; --rank) {
+        attacks |= (1ULL << rank * 8 + target_file);
+        if (check_for_blocker(rank * 8 + target_file, occupied_squares)) break;
+    }
+    for (int file = target_file + 1; file <= 7; ++file) {
+        attacks |= (1ULL << target_rank * 8 + file);
+        if (check_for_blocker(target_rank * 8 + file, occupied_squares)) break;
+    }
+    for (int file = target_file - 1; file >= 0; --file) {
+        attacks |= (1ULL << target_rank * 8 + file);
+        if (check_for_blocker(target_rank * 8 + file, occupied_squares)) break;
+    }
+
+    return attacks;
 }
 
 // Generates all of the attacks
@@ -123,11 +242,17 @@ constexpr void init_leapers_attacks() {
 int main() {
     GameState game {};
 
-    // game.print_board(generate_king_attacks(h4));
+    bitboard block { 0ULL };
+    set_bit(block, d7);
+    set_bit(block, d2);
+    set_bit(block, b4);
+    set_bit(block, f4);
 
-    init_leapers_attacks();
+    game.print_board(generate_rook_attacks(d4, block));
 
-    for (int square = 0; square < 64; ++square) {
-        game.print_board(king_attacks[square]);
-    }
+    // init_leapers_attacks();
+
+    // for (int square = 0; square < 64; ++square) {
+    //     game.print_board(king_attacks[square]);
+    // }
 }
