@@ -12,7 +12,7 @@ using std::array;
 using std::cout;
 
 using bitboard = uint64_t;
-using bitboardMapTable = array<array<bitboard, 64>, 2>;
+using bitboardMapTable = array<bitboard, 64>;
 
 // Define inline functions for accessing bits
 
