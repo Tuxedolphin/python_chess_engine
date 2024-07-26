@@ -13,6 +13,7 @@ As this project is entirely built in python3, please make sure that you have Pyt
 To install the engine, download the file directly from Git Hub or create a fork of the repository using the forked repository.
 
 After installing the folder, open the terminal and change the directory to this file. Then, run the following to install all the extensions used:
+
 ```
 pip install -r requirements.txt
 ```
@@ -42,6 +43,7 @@ After clicking on "play", a similar screen to this will greet you.
 </div>
 
 Note the following:
+
 1. The piece marked yellow is the last move made.
 2. The piece marked blue is the current piece selected.
 3. The squares marked red are the squares that the selected piece can move to.
@@ -60,6 +62,7 @@ When the game is over, a screen similar to this will show:
 ## Acknowledgements
 
 Special thanks to the kind people who has put up the following resources, without which I wouldn't have been able to complete this:
+
 1. The [Chess Programming Wiki](https://www.chessprogramming.org/Main_Page) for all of the amazing information about creating a chess engine.
 2. The [PESTO evaluation function](https://www.chessprogramming.org/PeSTO%27s_Evaluation_Function) which I edited slightly to form my evaluation function.
 3. The [CHess Engine in Python Series](https://www.youtube.com/watch?v=EnYui0e73Rs&list=PLBwF487qi8MGU81nDGaeNE1EnNEPYWKY_) by Eddie Sharick which I took reference from whenever I am stuck or was looking for inspiration.
