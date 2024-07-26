@@ -113,10 +113,10 @@ def options_screen(screen, clock) -> None:
     def create_button(position, text, selected):
         """Returns a button based on if it is selected"""
 
-        base_colour = black
+        base_colour = gray
 
         if selected:
-            base_colour = gray
+            base_colour = black
 
         return Button(
             None,
@@ -124,7 +124,7 @@ def options_screen(screen, clock) -> None:
             text,
             options_font,
             base_colour,
-            gray,
+            black,
             pygame.Color(240, 240, 240),
         )
 
