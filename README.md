@@ -64,5 +64,5 @@ When the game is over, a screen similar to this will show:
 Special thanks to the kind people who has put up the following resources, without which I wouldn't have been able to complete this:
 
 1. The [Chess Programming Wiki](https://www.chessprogramming.org/Main_Page) for all of the amazing information about creating a chess engine.
-2. The [PESTO evaluation function](https://www.chessprogramming.org/PeSTO%27s_Evaluation_Function) which I edited slightly to form my evaluation function.
+2. The [PESTO evaluation function](https://www.chessprogramming.org/PeSTO%27s_Evaluation_Function) which I edited slightly to create the evaluation function used.
 3. The [CHess Engine in Python Series](https://www.youtube.com/watch?v=EnYui0e73Rs&list=PLBwF487qi8MGU81nDGaeNE1EnNEPYWKY_) by Eddie Sharick which I took reference from whenever I am stuck or was looking for inspiration.
