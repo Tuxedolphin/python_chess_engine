@@ -59,6 +59,9 @@ When the game is over, a screen similar to this will show:
 > [!IMPORTANT]
 > Do not undo a move if it was a move made by the AI. As this engine is largely deterministic in nature as the evaluation function usually leads to only 1 best move, undoing a move will only make the engine think again and play the same move. Spamming the button will not work either but will only cause a backlog of undo moves, creating more lag.
 
+> [!NOTE]
+> Note that the number of positions searched by the AI as well as the evaluation of the move played is printed in the terminal. Do note that the evaluation is always positive for the AI, i.e. no matter the colour, the higher the number, the better the AI thinks the move is. If the AI sees mate, the evaluation will either be 100000 (if it is mating) or -100000 (if it is getting mated). To translate the evaluation to our what we commonly use, simply divide the number by 100.
+
 ## Acknowledgements
 
 Special thanks to the kind people who has put up the following resources, without which I wouldn't have been able to complete this:
