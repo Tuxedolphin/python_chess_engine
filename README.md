@@ -37,7 +37,7 @@ Simply click on the options that you desire. The options selected is automatical
 > [!IMPORTANT]
 > This program supports human vs human and ai vs ai. However, do note that if you choose ai vs ai, it is not possible to stop the program other than terminating it or waiting till the game is over.
 
-After clicking on "play", a similar screen to this will greet you.
+After clicking on "play", a similar screen to this will greet you (of course, this screenshot has been played out to demonstrate the UI).
 <div align="center">
   <img width="571" alt="chess_engine_play" src="https://github.com/user-attachments/assets/4605d045-16f2-446d-bbaf-3bf9c6cb901a">
 </div>
@@ -48,7 +48,7 @@ Note the following:
 2. The piece marked blue is the current piece selected.
 3. The squares marked red are the squares that the selected piece can move to.
 4. The pgn of the game is avaliable on the right hand side.
-5. To undo a move, press the `left arrow` button. To restart the game, press the `PgDn` button.
+5. To undo a move, press the `left arrow` key. To restart the game, press the `PgDn` key.
 
 When the game is over, a screen similar to this will show:
 
