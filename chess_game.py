@@ -22,14 +22,18 @@ AI = {
 
 pygame.init()  # Initialise pygame
 
+# To keep track of if human is playing black and/or white
+player_white = True
+player_black = False
+
 
 def main() -> None:
-    
+
     # Default AI is the negamax AI at depth 3 ply
     global ai
     global depth
     ai, depth = 4, 3
-    
+
     screen = pygame.display.set_mode((WIDTH + MOVE_LOG_WIDTH, HEIGHT))
     clock = pygame.time.Clock()
     screen.fill(pygame.Color("white"))
@@ -97,29 +101,108 @@ def main() -> None:
 
 
 def options_screen(screen, clock) -> None:
-    """ The options menu, where users choose the AI and depth """
-    
+    """The options menu, where users choose the AI and depth"""
+
     pygame.display.set_caption("Options")
     options_font = pygame.font.SysFont("arial", 25, False, False)
-    back_button = Button(None, (X_CENTER, HEIGHT - 30), "Back", options_font, pygame.Color("black"), pygame.Color("gray"))
-    
+    header_font = pygame.font.SysFont("arial", 40, False, False)
+
+    black = pygame.Color("black")
+    gray = pygame.Color("gray")
+
+    def create_button(position, text, selected):
+        """Returns a button based on if it is selected"""
+
+        base_colour = black
+
+        if selected:
+            base_colour = gray
+
+        return Button(
+            None,
+            position,
+            text,
+            options_font,
+            base_colour,
+            gray,
+            pygame.Color(240, 240, 240),
+        )
+
+    back_button = Button(
+        None, (X_CENTER, HEIGHT - 30), "Back", options_font, black, gray
+    )
+
+    # To keep track of which player is human
+    global player_white
+    global player_black
+
+    white_player_text = options_font.render("White:", True, black)
+    black_player_text = options_font.render("Black:", True, black)
+
+    white_player_rect = white_player_text.get_rect()
+    white_player_rect.center = (X_CENTER - 100, Y_CENTER - 40)
+
+    black_player_rect = black_player_text.get_rect()
+    black_player_rect.center = (X_CENTER - 100, Y_CENTER + 80)
+
+    options_text = header_font.render("Options", True, black)
+    options_text_rect = options_text.get_rect()
+    options_text_rect.center = (X_CENTER, Y_CENTER - 180)
+
     while True:
         mouse_pos = pygame.mouse.get_pos()
-        
+
         screen.fill(pygame.Color("white"))
-                
-        back_button.change_colour(mouse_pos)
-        back_button.update(screen)
-        
+
+        # Sets the buttons based on if they are selected
+        white_player_human_button = create_button(
+            (X_CENTER + 100, Y_CENTER - 40), "Human", player_white
+        )
+        white_player_ai_button = create_button(
+            (X_CENTER + 200, Y_CENTER - 40), "AI", not player_white
+        )
+        black_player_human_button = create_button(
+            (X_CENTER + 100, Y_CENTER + 80), "Human", player_black
+        )
+        black_player_ai_button = create_button(
+            (X_CENTER + 200, Y_CENTER + 80), "AI", not player_black
+        )
+
+        for button in [
+            white_player_human_button,
+            white_player_ai_button,
+            black_player_human_button,
+            black_player_ai_button,
+            back_button,
+        ]:
+            button.change_colour(mouse_pos)
+            button.update(screen)
+
+        screen.blit(white_player_text, white_player_rect)
+        screen.blit(black_player_text, black_player_rect)
+        screen.blit(options_text, options_text_rect)
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit()
-            
+
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if back_button.check_for_input(mouse_pos):
                     main()
-            
+
+                elif white_player_human_button.check_for_input(mouse_pos):
+                    player_white = True
+
+                elif white_player_ai_button.check_for_input(mouse_pos):
+                    player_white = False
+
+                elif black_player_human_button.check_for_input(mouse_pos):
+                    player_black = True
+
+                elif black_player_ai_button.check_for_input(mouse_pos):
+                    player_black = False
+
         pygame.display.update()
 
 
@@ -168,12 +251,14 @@ class Button:
             1
         ] in range(self.rect.top, self.rect.bottom)
 
-    def change_colour(self, position) -> None:
+    def change_colour(self, position) -> bool:
         """Changes colour of the button if the user is hovering over the button"""
         if self.check_for_input(position):
             self.text = self.font.render(self.text_input, True, self.hovering_colour)
+            return True
         else:
             self.text = self.font.render(self.text_input, True, self.base_colour)
+            return False
 
 
 def play_screen(screen: pygame.display, clock: pygame.time) -> None:
@@ -210,8 +295,9 @@ def play_screen(screen: pygame.display, clock: pygame.time) -> None:
     game_over = False
 
     # Keeps track of if player is playing white and black
-    player_white, player_black = True, False
-    
+    global player_white
+    global player_black
+
     button_pressed = False
 
     while True:
@@ -238,9 +324,9 @@ def play_screen(screen: pygame.display, clock: pygame.time) -> None:
 
             # If person clicks somewhere
             elif event.type == pygame.MOUSEBUTTONDOWN:
-                
+
                 button_pressed = True
-                
+
                 if game_over or not is_human_turn:
                     continue
 
@@ -373,11 +459,11 @@ def play_screen(screen: pygame.display, clock: pygame.time) -> None:
                 square_selected,
                 move_log_font,
                 coordinates,
-                button_pressed
+                button_pressed,
             )
             clock.tick(30)
             pygame.display.flip()
-            
+
         button_pressed = False
 
 
@@ -471,7 +557,13 @@ def draw_board(
     draw_squares(screen)
     move_highlighting(screen, game_state, valid_moves, square_selected)
     draw_pieces(screen, game_state.board)
-    draw_move_log(screen, game_state, move_log_font, mouse_pos, button_pressed,)
+    draw_move_log(
+        screen,
+        game_state,
+        move_log_font,
+        mouse_pos,
+        button_pressed,
+    )
 
 
 def draw_squares(screen: pygame.display) -> None:
@@ -552,13 +644,13 @@ def draw_move_log(
     padding = 5
     line_spacing = 17
     button_y_pos = 25
-    
+
     global delta_y
-    delta_y = 0 if delta_y < 0 else delta_y * 10
-    
+    delta_y = 0 if delta_y < 0 else delta_y
+
     # x, y location of each text
     text_x = padding
-    text_y = padding - line_spacing - delta_y + button_y_pos * 2
+    text_y = padding - line_spacing - delta_y * 10 + button_y_pos * 2
 
     for i, move_text in enumerate(move_texts):
 
@@ -574,7 +666,7 @@ def draw_move_log(
         text_object = move_log_font.render(move_text, 0, pygame.Color("white"))
         text_location = move_log_rect.move(text_x, text_y)
         screen.blit(text_object, text_location)
-    
+
     rect = pygame.Rect(WIDTH, 0, MOVE_LOG_WIDTH, button_y_pos * 2)
     pygame.draw.rect(screen, (0, 0, 0), rect)
 
@@ -592,7 +684,7 @@ def draw_move_log(
     if button_pressed:
         if back_button.check_for_input(mouse_pos):
             main()
-    
+
     back_button.change_colour(mouse_pos)
     back_button.update(screen)
 
