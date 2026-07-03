@@ -1,4 +1,15 @@
 import copy
+import random
+
+_zobrist_generator = random.Random(20)
+
+ZOBRIST_PIECES = {
+    piece: [[_zobrist_generator.getrandbits(64) for _ in range(8)] for _ in range(8)]
+    for piece in ["wp", "wN", "wB", "wR", "wQ", "wK", "bp", "bN", "bB", "bR", "bQ", "bK"]
+}
+ZOBRIST_BLACK_TO_MOVE = _zobrist_generator.getrandbits(64)
+ZOBRIST_CASTLING = [_zobrist_generator.getrandbits(64) for _ in range(4)]
+ZOBRIST_EN_PASSANT_FILE = [_zobrist_generator.getrandbits(64) for _ in range(8)]
 
 
 class GameState:
@@ -61,6 +72,35 @@ class GameState:
         
         # Keeps track of the draw status of the board
         self.draw_log = [DrawChecker(self.board, 0)]
+
+        self.board_hash = self.compute_board_hash()
+        self.board_hash_log = [self.board_hash]
+
+    def compute_board_hash(self) -> int:
+        board_hash = 0
+        for row in range(8):
+            for column in range(8):
+                piece = self.board[row][column]
+                if piece:
+                    board_hash ^= ZOBRIST_PIECES[piece][row][column]
+        return board_hash
+
+    def zobrist_key(self) -> int:
+        key = self.board_hash
+        if not self.white_move:
+            key ^= ZOBRIST_BLACK_TO_MOVE
+        rights = self.current_castle_rights
+        if rights.white_king_side:
+            key ^= ZOBRIST_CASTLING[0]
+        if rights.white_queen_side:
+            key ^= ZOBRIST_CASTLING[1]
+        if rights.black_king_side:
+            key ^= ZOBRIST_CASTLING[2]
+        if rights.black_queen_side:
+            key ^= ZOBRIST_CASTLING[3]
+        if self.en_passant_square:
+            key ^= ZOBRIST_EN_PASSANT_FILE[self.en_passant_square[1]]
+        return key
 
     def make_move(self, move, promotion_type: str = "") -> None:
         """
@@ -154,12 +194,49 @@ class GameState:
 
         self.castle_rights_log.append(self.current_castle_rights.copy())
 
+        new_hash = (
+            self.board_hash
+            ^ ZOBRIST_PIECES[move.piece_moved][move.start_row][move.start_column]
+        )
+
+        if move.piece_captured:
+            if move.is_en_passant:
+                new_hash ^= ZOBRIST_PIECES[move.piece_captured][move.start_row][
+                    move.end_column
+                ]
+            else:
+                new_hash ^= ZOBRIST_PIECES[move.piece_captured][move.end_row][
+                    move.end_column
+                ]
+
+        end_piece = (
+            move.piece_moved[0] + promotion_type
+            if move.is_pawn_promotion
+            else move.piece_moved
+        )
+        new_hash ^= ZOBRIST_PIECES[end_piece][move.end_row][move.end_column]
+
+        if move.king_side_castle:
+            rook = move.piece_moved[0] + "R"
+            new_hash ^= ZOBRIST_PIECES[rook][move.end_row][move.end_column + 1]
+            new_hash ^= ZOBRIST_PIECES[rook][move.end_row][move.end_column - 1]
+
+        elif move.queen_side_castle:
+            rook = move.piece_moved[0] + "R"
+            new_hash ^= ZOBRIST_PIECES[rook][move.end_row][move.end_column - 2]
+            new_hash ^= ZOBRIST_PIECES[rook][move.end_row][move.end_column + 1]
+
+        self.board_hash = new_hash
+        self.board_hash_log.append(new_hash)
+
         self.white_move = not self.white_move
         
         if move.piece_moved[1] == "p":
             fifty_move_rule_reset = True
         
-        new_draw_checker = copy.deepcopy(self.draw_log[-1])
+        previous_checker = self.draw_log[-1]
+        new_draw_checker = DrawChecker(self.board, previous_checker.move_counter)
+        new_draw_checker.past_boards = dict(previous_checker.past_boards)
         new_draw_checker.update_checker(self.board, 1)
         
         if fifty_move_rule_reset:
@@ -231,6 +308,9 @@ class GameState:
                     
             # Removes the last draw checker
             self.draw_log.pop()
+
+            self.board_hash_log.pop()
+            self.board_hash = self.board_hash_log[-1]
             
 
     def get_valid_moves(self) -> list:

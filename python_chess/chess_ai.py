@@ -2,6 +2,11 @@ from .chess_logic import *
 import random
 import copy
 
+TT_EXACT, TT_LOWER, TT_UPPER = 0, 1, 2
+TT_MAX_ENTRIES = 2_000_000
+
+transposition_table = {}
+
 
 def return_move(move: Move, evaluation) -> tuple[Move, str, int]:
     """
@@ -238,9 +243,31 @@ def get_negamax_evaluation(
     if not depth:
         return turn_multiplier * get_board_evaluation(game_state, valid_moves)
 
+    key = game_state.zobrist_key()
+    tt_move = None
+    entry = transposition_table.get(key)
+
+    if entry:
+        entry_depth, entry_score, entry_flag, tt_move = entry
+        if entry_depth >= depth:
+            if entry_flag == TT_EXACT:
+                return entry_score
+            if entry_flag == TT_LOWER and entry_score >= beta:
+                return entry_score
+            if entry_flag == TT_UPPER and entry_score <= alpha:
+                return entry_score
+
     # Move ordering - find moves that are better (check and captures first)
     valid_moves = order_moves(valid_moves)
 
+    if tt_move:
+        for index, candidate in enumerate(valid_moves):
+            if candidate.move == tt_move:
+                valid_moves.insert(0, valid_moves.pop(index))
+                break
+
+    alpha_original = alpha
+    best_move = None
     max_evaluation = -100000
 
     for move in valid_moves:
@@ -265,6 +292,7 @@ def get_negamax_evaluation(
 
         if evaluation > max_evaluation:
             max_evaluation = evaluation
+            best_move = move
 
         game_state.undo_move()
 
@@ -274,6 +302,24 @@ def get_negamax_evaluation(
 
         if alpha >= beta:
             break
+
+    if max_evaluation >= beta:
+        flag = TT_LOWER
+    elif max_evaluation <= alpha_original:
+        flag = TT_UPPER
+    else:
+        flag = TT_EXACT
+
+    if len(transposition_table) >= TT_MAX_ENTRIES:
+        transposition_table.clear()
+
+    transposition_table[key] = (
+        depth,
+        max_evaluation,
+        flag,
+        best_move.move if best_move else None,
+    )
+
     return max_evaluation
 
 
