@@ -4,6 +4,7 @@ import copy
 
 TT_EXACT, TT_LOWER, TT_UPPER = 0, 1, 2
 TT_MAX_ENTRIES = 2_000_000
+QUIESCENCE_MAX_DEPTH = 8
 
 transposition_table = {}
 
@@ -224,6 +225,55 @@ def negamax_ai(
     return return_move(return_random_move(best_net_moves), max_evaluation)
 
 
+def quiescence_search(
+    game_state: GameState,
+    valid_moves: list[Move],
+    turn_multiplier: int,
+    alpha: float,
+    beta: float,
+    depth: int,
+) -> float:
+    global counter
+
+    stand_pat = turn_multiplier * get_board_evaluation(game_state, valid_moves)
+
+    if stand_pat >= beta:
+        return beta
+
+    if stand_pat > alpha:
+        alpha = stand_pat
+
+    if not depth:
+        return alpha
+
+    for move in order_moves(valid_moves):
+        if not move.piece_captured and not move.is_pawn_promotion:
+            break
+
+        if move.is_pawn_promotion:
+            game_state.make_move(move, "Q")
+
+        else:
+            game_state.make_move(move)
+
+        next_valid_moves = game_state.get_valid_moves()
+        counter += 1
+
+        evaluation = -quiescence_search(
+            game_state, next_valid_moves, -turn_multiplier, -beta, -alpha, depth - 1
+        )
+
+        game_state.undo_move()
+
+        if evaluation >= beta:
+            return beta
+
+        if evaluation > alpha:
+            alpha = evaluation
+
+    return alpha
+
+
 def get_negamax_evaluation(
     game_state: GameState,
     valid_moves: list[Move],
@@ -241,7 +291,9 @@ def get_negamax_evaluation(
     global counter
 
     if not depth:
-        return turn_multiplier * get_board_evaluation(game_state, valid_moves)
+        return quiescence_search(
+            game_state, valid_moves, turn_multiplier, alpha, beta, QUIESCENCE_MAX_DEPTH
+        )
 
     key = game_state.zobrist_key()
     tt_move = None
