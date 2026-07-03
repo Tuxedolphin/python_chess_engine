@@ -62,6 +62,42 @@ When the game is over, a screen similar to this will show:
 > [!NOTE]
 > Note that the number of positions searched by the AI as well as the evaluation of the move played is printed in the terminal. Do note that the evaluation is always positive for the AI, i.e. no matter the colour, the higher the number, the better the AI thinks the move is. If the AI sees mate, the evaluation will either be 100000 (if it is mating) or -100000 (if it is getting mated). To translate the evaluation to our what we commonly use, simply divide the number by 100.
 
+## UCI Support
+
+The engine speaks [UCI](https://www.chessprogramming.org/UCI) via `uci.py` (requires Python 3.10+), so it can be loaded into any standard chess GUI (Arena, Cute Chess, BanksiaGUI) or match runner:
+
+```
+python3 uci.py
+```
+
+`scripts/engine.sh` is a launcher that picks a suitable Python and starts the adapter — point GUIs and tools at that. Search depth defaults to 3 and can be changed with `setoption name Depth value N` or `go depth N`.
+
+## Estimating Its Strength
+
+`scripts/estimate_elo.sh` plays rating matches against strength-limited [Stockfish](https://stockfishchess.org/) using [fastchess](https://github.com/Disservin/fastchess) and prints an Elo estimate per level:
+
+```
+brew install stockfish
+ROUNDS=15 LEVELS="1320 1400 1500" scripts/estimate_elo.sh
+```
+
+Games and logs land in `elo_results/`. Note that Stockfish's `UCI_Elo` floor is 1320, so if the engine scores near zero at every level, the more meaningful number is its online rating from real games (below).
+
+## Playing It Online
+
+The engine runs on Lichess through [lichess-bot](https://github.com/lichess-bot-devs/lichess-bot), which both lets anyone challenge it and gives it a real Lichess rating from rated games:
+
+1. Clone lichess-bot and install its requirements (Python 3.10+ venv recommended).
+2. Create a new Lichess account for the bot (it must have played no games), generate a personal API token with the `bot:play` scope, and put it in lichess-bot's `config.yml`.
+3. In `config.yml`, set `engine.dir` to this repository's `scripts/` folder, `engine.name` to `engine.sh`, `engine.working_dir` to this repository's root, and `go_commands: depth: 3`.
+4. Upgrade the account to a bot account and start it:
+
+```
+python3 lichess-bot.py -u
+```
+
+Once online, anyone can play it at `https://lichess.org/@/<bot-username>`.
+
 ## Acknowledgements
 
 Special thanks to the kind people who has put up the following resources, without which I wouldn't have been able to complete this:
