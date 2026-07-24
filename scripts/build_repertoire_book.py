@@ -21,13 +21,17 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 OUTPUT_PY_FILE = "opening_book.py"
 
-# (path, our_color_is_white)
+# (path, our_color_is_white, first_move_filter)
+# first_move_filter restricts a source to keys starting with that UCI move —
+# needed when a course bundles bonus chapters for other openings (the 1.c4
+# course also ships 1.e4 c5 lines that must not override the e4 repertoire).
 SOURCES = (
-    ("book_sources/white_d4_shankland_p1.pgn", True),
-    ("book_sources/white_d4_shankland_p2.pgn", True),
-    ("book_sources/white_d4_shankland_p3.pgn", True),
-    ("book_sources/black_e4_scandinavian.pgn", False),
-    ("book_sources/black_d4_slav.pgn", False),
+    ("book_sources/white_d4_shankland_p1.pgn", True, None),
+    ("book_sources/white_d4_shankland_p2.pgn", True, None),
+    ("book_sources/white_d4_shankland_p3.pgn", True, None),
+    ("book_sources/black_e4_scandinavian.pgn", False, None),
+    ("book_sources/black_d4_slav.pgn", False, None),
+    ("book_sources/black_c4_english.pgn", False, "c2c4"),
 )
 
 # Chapters that hold complete games or exercises rather than repertoire lines.
@@ -98,11 +102,27 @@ def resolve_conflicts(entries):
     return book
 
 
+def filter_entries(entries, first_move):
+    """Keeps only keys whose move history starts with first_move."""
+    if first_move is None:
+        return entries
+    return {k: v for k, v in entries.items() if k.split()[:1] == [first_move]}
+
+
 def main():
+    for path, _, _ in SOURCES:
+        if not os.path.exists(path):
+            sys.exit(
+                f"Missing source {path} — re-download all course PGNs before a "
+                f"full rebuild, or the current book would lose that repertoire."
+            )
+
     combined = {}
-    for path, our_color_is_white in SOURCES:
+    for path, our_color_is_white, first_move in SOURCES:
         with open(path, encoding="utf-8", errors="replace") as handle:
-            entries = collect_entries(handle, our_color_is_white)
+            entries = filter_entries(
+                collect_entries(handle, our_color_is_white), first_move
+            )
         for key, replies in entries.items():
             target = combined.setdefault(key, {})
             for reply, count in replies.items():

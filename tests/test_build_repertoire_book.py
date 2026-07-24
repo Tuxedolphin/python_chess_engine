@@ -2,7 +2,11 @@ import io
 import unittest
 
 try:
-    from scripts.build_repertoire_book import collect_entries, resolve_conflicts
+    from scripts.build_repertoire_book import (
+        collect_entries,
+        filter_entries,
+        resolve_conflicts,
+    )
 except ImportError:  # book tooling needs python-chess (CPython only)
     raise unittest.SkipTest("python-chess not available in this interpreter")
 
@@ -96,6 +100,19 @@ class CollectEntriesTests(unittest.TestCase):
     def test_model_games_are_skipped(self):
         entries = collect_entries(io.StringIO(MODEL_GAME_PGN), our_color_is_white=True)
         self.assertEqual(entries, {})
+
+
+class FilterEntriesTests(unittest.TestCase):
+    def test_keeps_only_lines_starting_with_first_move(self):
+        entries = {"c2c4": {"e7e5": 1}, "e2e4": {"c7c5": 1}, "c2c4 e7e5 g2g3": {"g8f6": 1}}
+        self.assertEqual(
+            filter_entries(entries, "c2c4"),
+            {"c2c4": {"e7e5": 1}, "c2c4 e7e5 g2g3": {"g8f6": 1}},
+        )
+
+    def test_none_filter_keeps_everything(self):
+        entries = {"": {"d2d4": 1}, "e2e4": {"d7d5": 1}}
+        self.assertEqual(filter_entries(entries, None), entries)
 
 
 class ResolveConflictsTests(unittest.TestCase):
