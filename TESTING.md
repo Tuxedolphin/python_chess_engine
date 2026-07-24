@@ -16,6 +16,7 @@ per opening pair, openings from `scripts/openings.epd`.
 | vs Stockfish 2000, 20s/move (clean, all mates) | 20 games | 70% | perf ≈ 2147 |
 | Knight outposts + bad bishop (vs deployed bundle) | 30 games, 2s/move | +23 ± 149 (flat) | kept |
 | Timing bundle (ramp, stability discount, 6× gate, mate-stop) | 20 games, 5+3 | −53 ± 138 (flat, LOS 21%) | kept — motivated by live-game clock pathologies, not Elo |
+| Piece-count budget + hard-budget depth gate (vs same build, old timing) | 20 games, 300+3 | −89 ± 148, LOS 9.5%, no time forfeits either side | gate reverted (aborted-depth time waste suspected); piece-count budget kept, re-test solo pending |
 
 Combined Stockfish ladder estimate: **~2,050–2,100 at 20s/move** (M3, PyPy).
 

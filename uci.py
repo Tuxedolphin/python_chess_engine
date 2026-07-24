@@ -171,21 +171,6 @@ def time_budget(game_state: GameState, params: dict) -> tuple[float, float] | No
     return soft, hard
 
 
-def should_start_next_depth(
-    elapsed: float, iteration_time: float, soft: float, hard: float, stable: bool
-) -> bool:
-    """
-    Gate for iterative deepening: start another depth only if enough soft
-    budget remains and the ~6x-per-depth estimate fits the hard budget (the
-    mid-search deadline aborts and falls back to the previous depth's move,
-    so an optimistic start costs at most the hard cap).
-    """
-    stop_fraction = 0.35 if stable else 0.5
-    if elapsed > soft * stop_fraction:
-        return False
-    return elapsed + iteration_time * 6 <= hard
-
-
 def handle_go(game_state_holder: dict, tokens: list[str], default_depth: int) -> str:
     game_state = game_state_holder["state"]
 
@@ -249,10 +234,13 @@ def handle_go(game_state_holder: dict, tokens: list[str], default_depth: int) ->
             break
 
         if budget is not None:
+            stop_fraction = 0.35 if move is previous_best else 0.5
+            if elapsed > soft * stop_fraction:
+                break
+
             iteration_time = elapsed - previous_elapsed
-            if not should_start_next_depth(
-                elapsed, iteration_time, soft, hard, move is previous_best
-            ):
+            allowance = soft if move is previous_best else soft * 1.6
+            if elapsed + iteration_time * 6 > allowance:
                 break
 
         previous_best = move
