@@ -145,7 +145,6 @@ def handle_position(game_state_holder: dict, tokens: list[str]) -> None:
             apply_uci_move(game_state, uci)
 
     game_state_holder["state"] = game_state
-    game_state_holder["book_key"] = " ".join(played) if from_startpos else None
 
 
 def time_budget(game_state: GameState, params: dict) -> tuple[float, float] | None:
@@ -190,14 +189,12 @@ def should_start_next_depth(
 def handle_go(game_state_holder: dict, tokens: list[str], default_depth: int) -> str:
     game_state = game_state_holder["state"]
 
-    book_key = game_state_holder.get("book_key")
-    if book_key is not None:
-        book_move = BOOK.get(book_key)
-        if book_move:
-            for move in game_state.get_valid_moves():
-                if move_to_uci(move) == book_move:
-                    print("info string book move", flush=True)
-                    return f"bestmove {book_move}"
+    book_move = BOOK.get(str(game_state.zobrist_key()))
+    if book_move:
+        for move in game_state.get_valid_moves():
+            if move_to_uci(move) == book_move:
+                print("info string book move", flush=True)
+                return f"bestmove {book_move}"
 
     params = {}
     for key in ("wtime", "btime", "winc", "binc", "movetime", "depth"):
@@ -272,7 +269,7 @@ def handle_go(game_state_holder: dict, tokens: list[str], default_depth: int) ->
 
 
 def main() -> None:
-    game_state_holder = {"state": GameState(), "book_key": ""}
+    game_state_holder = {"state": GameState()}
     depth = DEFAULT_DEPTH
 
     for line in sys.stdin:
@@ -292,7 +289,6 @@ def main() -> None:
 
         elif command == "ucinewgame":
             game_state_holder["state"] = GameState()
-            game_state_holder["book_key"] = ""
 
         elif command == "setoption":
             if "Depth" in args and "value" in args:

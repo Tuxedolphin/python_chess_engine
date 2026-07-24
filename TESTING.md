@@ -33,10 +33,13 @@ Run each overnight; one at a time, Mac plugged in + `caffeinate -is`.
      y7yKc0KB: after 8.O-O the old gate stopped at depth 4 and played
      8...O-O-O (+171cp Stockfish); new gate reaches depth 5 and plays
      8...e5 (+87cp). Use that position as the smoke check.
-   - *Zobrist-keyed opening book* (planned): key on position hash instead
-     of move history so course transpositions hit. Needs source PGNs
-     re-downloaded into book_sources/. Stockfish extension of remaining
-     coverage gaps is deferred until after this rebuild.
+   - *Zobrist-keyed opening book* — shipped 2026-07-24
+     (scripts/build_zobrist_book.py, 24,419 entries; Black vs 1.e4 switched
+     from Scandinavian to Werle 1.e4 e5 when the Scandi PGN couldn't be
+     re-downloaded). A/B vs the history-keyed 26,675-entry build
+     (opening_book.py at git tag/commit "feat: added 1.c4 e5 repertoire").
+     Stockfish extension of remaining coverage gaps deferred until after
+     that A/B.
    - *Opening book: Scandinavian 3...Qd6 vs Werle 1.e4 e5* as Black.
      Werle PGN kept in repo root (dump format — needs the converter in a
      variant of scripts/build_repertoire_book.py). Build a second
