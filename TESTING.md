@@ -28,6 +28,15 @@ Run each overnight; one at a time, Mac plugged in + `caffeinate -is`.
    - *Piece-count time budget* (remaining/10 + taper below 14 pieces,
      shipped 2026-07-24 with the EGTB rationale) vs the old flat
      remaining/12 build. First priority — it shipped unvalidated.
+   - *Depth gate on hard budget* (shipped 2026-07-24, also unvalidated —
+     A/B together with or after the budget change). Motivating game
+     y7yKc0KB: after 8.O-O the old gate stopped at depth 4 and played
+     8...O-O-O (+171cp Stockfish); new gate reaches depth 5 and plays
+     8...e5 (+87cp). Use that position as the smoke check.
+   - *Zobrist-keyed opening book* (planned): key on position hash instead
+     of move history so course transpositions hit. Needs source PGNs
+     re-downloaded into book_sources/. Stockfish extension of remaining
+     coverage gaps is deferred until after this rebuild.
    - *Opening book: Scandinavian 3...Qd6 vs Werle 1.e4 e5* as Black.
      Werle PGN kept in repo root (dump format — needs the converter in a
      variant of scripts/build_repertoire_book.py). Build a second
