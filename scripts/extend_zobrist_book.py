@@ -14,7 +14,9 @@ OUTPUT_PY_FILE every 50 added entries, so the run survives interruption
 with a usable book and can be resumed (existing entries are kept).
 
 Run under the pypy venv (needs python-chess AND the engine):
-    buildvenv/bin/python scripts/extend_zobrist_book.py [max_ply]
+    buildvenv/bin/python scripts/extend_zobrist_book.py [max_ply] [white|black|both]
+
+STOCKFISH_THREADS env var overrides the thread count (default 4).
 """
 
 import json
@@ -69,12 +71,15 @@ def zobrist_of(path):
 
 def main():
     max_ply = int(sys.argv[1]) if len(sys.argv) > 1 else MAX_PLY
+    colours = sys.argv[2] if len(sys.argv) > 2 else "both"
 
     from opening_book import BOOK
 
     book = dict(BOOK)
     sf = chess.engine.SimpleEngine.popen_uci("stockfish")
-    sf.configure({"Threads": 4, "Hash": 512})
+    sf.configure(
+        {"Threads": int(os.environ.get("STOCKFISH_THREADS", 4)), "Hash": 512}
+    )
 
     added = 0
     start = time.time()
@@ -135,7 +140,8 @@ def main():
             for uci in select_candidates(scored, observed, WINDOW_CP):
                 walk(path + [uci], bot_is_white)
 
-    for bot_is_white in (True, False):
+    sides = {"white": (True,), "black": (False,), "both": (True, False)}[colours]
+    for bot_is_white in sides:
         colour = "white" if bot_is_white else "black"
         print(f"=== extending, bot as {colour}, to ply {max_ply} ===", flush=True)
         walk([], bot_is_white)
