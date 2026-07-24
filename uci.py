@@ -16,15 +16,20 @@ import io
 import sys
 import time
 
+from python_chess import chess_ai
 from python_chess.chess_ai import negamax_ai
 from python_chess.chess_logic import CastleRights, DrawChecker, GameState, Move
+
+try:
+    from opening_book import BOOK
+except ImportError:
+    BOOK = {}
 
 ENGINE_NAME = "python_chess_engine"
 ENGINE_AUTHOR = "Zhuo Zhuzhen"
 
 DEFAULT_DEPTH = 3
-MAX_DEPTH = 6
-BRANCHING_ESTIMATE = 8
+MAX_DEPTH = 12
 
 FEN_TO_PIECE = {
     "P": "wp", "N": "wN", "B": "wB", "R": "wR", "Q": "wQ", "K": "wK",
@@ -98,6 +103,11 @@ def game_state_from_fen(fen: str) -> GameState:
     game_state.board_hash = game_state.compute_board_hash()
     game_state.board_hash_log = [game_state.board_hash]
 
+    position_key = game_state.zobrist_key()
+    game_state.position_key_log = [position_key]
+    game_state.position_counts = {position_key: 1}
+    game_state.en_passant_log = [game_state.en_passant_square]
+
     return game_state
 
 
@@ -115,8 +125,11 @@ def apply_uci_move(game_state: GameState, uci: str) -> None:
 
 
 def handle_position(game_state_holder: dict, tokens: list[str]) -> None:
+    from_startpos = False
+
     if tokens and tokens[0] == "startpos":
         game_state = GameState()
+        from_startpos = True
         tokens = tokens[1:]
     elif tokens and tokens[0] == "fen":
         fen = " ".join(tokens[1:7])
@@ -125,26 +138,44 @@ def handle_position(game_state_holder: dict, tokens: list[str]) -> None:
     else:
         return
 
+    played = []
     if tokens and tokens[0] == "moves":
-        for uci in tokens[1:]:
+        played = tokens[1:]
+        for uci in played:
             apply_uci_move(game_state, uci)
 
     game_state_holder["state"] = game_state
+    game_state_holder["book_key"] = " ".join(played) if from_startpos else None
 
 
-def time_budget(game_state: GameState, params: dict) -> float | None:
+def time_budget(game_state: GameState, params: dict) -> tuple[float, float] | None:
     if "movetime" in params:
-        return params["movetime"] / 1000
+        cap = params["movetime"] * 0.9 / 1000
+        return cap, cap
 
     remaining = params.get("wtime" if game_state.white_move else "btime")
     if remaining is None:
         return None
 
     increment = params.get("winc" if game_state.white_move else "binc", 0)
-    return min(remaining / 12 + increment * 0.8, remaining / 3) / 1000
+    soft = (remaining / 12 + increment / 2) / 1000
+    soft *= min(0.35 + len(game_state.move_log) * 0.025, 1.0)
+    hard = min(soft * 2, remaining / 4 / 1000)
+    return soft, hard
 
 
-def handle_go(game_state: GameState, tokens: list[str], default_depth: int) -> str:
+def handle_go(game_state_holder: dict, tokens: list[str], default_depth: int) -> str:
+    game_state = game_state_holder["state"]
+
+    book_key = game_state_holder.get("book_key")
+    if book_key is not None:
+        book_move = BOOK.get(book_key)
+        if book_move:
+            for move in game_state.get_valid_moves():
+                if move_to_uci(move) == book_move:
+                    print("info string book move", flush=True)
+                    return f"bestmove {book_move}"
+
     params = {}
     for key in ("wtime", "btime", "winc", "binc", "movetime", "depth"):
         if key in tokens:
@@ -154,6 +185,10 @@ def handle_go(game_state: GameState, tokens: list[str], default_depth: int) -> s
     if not valid_moves:
         return "bestmove 0000"
 
+    if len(valid_moves) == 1 and "depth" not in params:
+        print("info string forced move", flush=True)
+        return f"bestmove {move_to_uci(valid_moves[0])}"
+
     if "depth" in params:
         max_depth = params["depth"]
         budget = None
@@ -161,29 +196,63 @@ def handle_go(game_state: GameState, tokens: list[str], default_depth: int) -> s
         budget = time_budget(game_state, params)
         max_depth = MAX_DEPTH if budget is not None else default_depth
 
+    soft, hard = budget if budget is not None else (None, None)
+
     start = time.monotonic()
     best_move = None
+    reached_depth = 0
+    evaluation = 0.0
+
+    move_log_length = len(game_state.move_log)
+    previous_best = None
+    previous_elapsed = 0.0
 
     for depth in range(1, max_depth + 1):
-        with contextlib.redirect_stdout(io.StringIO()):
-            move, _, evaluation = negamax_ai(game_state, valid_moves, depth)
+        if budget is None or depth == 1 or best_move is None:
+            chess_ai.SEARCH_DEADLINE = None
+        else:
+            chess_ai.SEARCH_DEADLINE = start + hard
 
-        best_move = move
-        elapsed = time.monotonic() - start
-        print(
-            f"info depth {depth} score cp {int(evaluation * 100)}"
-            f" time {int(elapsed * 1000)}",
-            flush=True,
-        )
-
-        if budget is not None and elapsed * BRANCHING_ESTIMATE > budget:
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                move, _, evaluation = negamax_ai(game_state, valid_moves, depth)
+        except chess_ai.SearchTimeout:
+            while len(game_state.move_log) > move_log_length:
+                game_state.undo_move()
             break
 
+        best_move = move
+        reached_depth = depth
+        elapsed = time.monotonic() - start
+
+        if evaluation >= chess_ai.MATE_SCORE:
+            break
+
+        if budget is not None:
+            stop_fraction = 0.35 if move is previous_best else 0.5
+            if elapsed > soft * stop_fraction:
+                break
+
+            iteration_time = elapsed - previous_elapsed
+            allowance = soft if move is previous_best else soft * 1.6
+            if elapsed + iteration_time * 6 > allowance:
+                break
+
+        previous_best = move
+        previous_elapsed = elapsed
+
+    chess_ai.SEARCH_DEADLINE = None
+    elapsed = time.monotonic() - start
+    print(
+        f"info depth {reached_depth} score cp {int(evaluation * 100)}"
+        f" time {int(elapsed * 1000)}",
+        flush=True,
+    )
     return f"bestmove {move_to_uci(best_move)}"
 
 
 def main() -> None:
-    game_state_holder = {"state": GameState()}
+    game_state_holder = {"state": GameState(), "book_key": ""}
     depth = DEFAULT_DEPTH
 
     for line in sys.stdin:
@@ -203,6 +272,7 @@ def main() -> None:
 
         elif command == "ucinewgame":
             game_state_holder["state"] = GameState()
+            game_state_holder["book_key"] = ""
 
         elif command == "setoption":
             if "Depth" in args and "value" in args:
@@ -212,7 +282,7 @@ def main() -> None:
             handle_position(game_state_holder, args)
 
         elif command == "go":
-            print(handle_go(game_state_holder["state"], args, depth), flush=True)
+            print(handle_go(game_state_holder, args, depth), flush=True)
 
         elif command == "quit":
             break

@@ -1,10 +1,19 @@
 from .chess_logic import *
 import random
 import copy
+import time
+
+
+class SearchTimeout(Exception):
+    pass
+
+
+SEARCH_DEADLINE = None
 
 TT_EXACT, TT_LOWER, TT_UPPER = 0, 1, 2
 TT_MAX_ENTRIES = 2_000_000
 QUIESCENCE_MAX_DEPTH = 8
+MATE_SCORE = 10000
 
 transposition_table = {}
 
@@ -235,19 +244,43 @@ def quiescence_search(
 ) -> float:
     global counter
 
+    key = game_state.zobrist_key()
+
+    if (
+        game_state.position_counts.get(key, 0) >= 2
+        or game_state.draw_log[-1].move_counter >= 100
+    ):
+        return 0
+
+    entry = transposition_table.get(key)
+
+    if entry:
+        _, entry_score, entry_flag, _ = entry
+        if entry_flag == TT_EXACT:
+            return entry_score
+        if entry_flag == TT_LOWER and entry_score >= beta:
+            return entry_score
+        if entry_flag == TT_UPPER and entry_score <= alpha:
+            return entry_score
+
+    alpha_original = alpha
+    in_check = bool(game_state.in_check and valid_moves)
     stand_pat = turn_multiplier * get_board_evaluation(game_state, valid_moves)
 
-    if stand_pat >= beta:
-        return beta
+    if not in_check:
+        if stand_pat >= beta:
+            return stand_pat
 
-    if stand_pat > alpha:
-        alpha = stand_pat
+        if stand_pat > alpha:
+            alpha = stand_pat
 
     if not depth:
-        return alpha
+        return stand_pat if in_check else alpha
+
+    max_evaluation = -100000 if in_check else alpha
 
     for move in order_moves(valid_moves):
-        if not move.piece_captured and not move.is_pawn_promotion:
+        if not in_check and not move.piece_captured and not move.is_pawn_promotion:
             break
 
         if move.is_pawn_promotion:
@@ -265,13 +298,31 @@ def quiescence_search(
 
         game_state.undo_move()
 
-        if evaluation >= beta:
-            return beta
+        if evaluation > max_evaluation:
+            max_evaluation = evaluation
 
-        if evaluation > alpha:
-            alpha = evaluation
+        if max_evaluation > alpha:
+            alpha = max_evaluation
 
-    return alpha
+        if alpha >= beta:
+            break
+
+    result = max_evaluation if in_check else alpha
+
+    if abs(result) < MATE_SCORE:
+        if result <= alpha_original:
+            flag = TT_UPPER
+        elif result >= beta:
+            flag = TT_LOWER
+        else:
+            flag = TT_EXACT
+
+        if len(transposition_table) >= TT_MAX_ENTRIES:
+            transposition_table.clear()
+
+        transposition_table[key] = (0, result, flag, None)
+
+    return result
 
 
 def get_negamax_evaluation(
@@ -290,12 +341,24 @@ def get_negamax_evaluation(
 
     global counter
 
+    if SEARCH_DEADLINE is not None and time.monotonic() > SEARCH_DEADLINE:
+        raise SearchTimeout
+
+    key = game_state.zobrist_key()
+
+    if (
+        game_state.position_counts.get(key, 0) >= 2
+        or game_state.draw_log[-1].move_counter >= 100
+    ):
+        return 0
+
+    if not valid_moves:
+        return -(MATE_SCORE + depth) if game_state.in_check else 0
+
     if not depth:
         return quiescence_search(
             game_state, valid_moves, turn_multiplier, alpha, beta, QUIESCENCE_MAX_DEPTH
         )
-
-    key = game_state.zobrist_key()
     tt_move = None
     entry = transposition_table.get(key)
 
@@ -355,24 +418,272 @@ def get_negamax_evaluation(
         if alpha >= beta:
             break
 
-    if max_evaluation >= beta:
-        flag = TT_LOWER
-    elif max_evaluation <= alpha_original:
-        flag = TT_UPPER
-    else:
-        flag = TT_EXACT
+    if abs(max_evaluation) < MATE_SCORE:
+        if max_evaluation >= beta:
+            flag = TT_LOWER
+        elif max_evaluation <= alpha_original:
+            flag = TT_UPPER
+        else:
+            flag = TT_EXACT
 
-    if len(transposition_table) >= TT_MAX_ENTRIES:
-        transposition_table.clear()
+        if len(transposition_table) >= TT_MAX_ENTRIES:
+            transposition_table.clear()
 
-    transposition_table[key] = (
-        depth,
-        max_evaluation,
-        flag,
-        best_move.move if best_move else None,
-    )
+        transposition_table[key] = (
+            depth,
+            max_evaluation,
+            flag,
+            best_move.move if best_move else None,
+        )
 
     return max_evaluation
+
+
+def positional_evaluation(board: list[list[str]], white_move: bool) -> float:
+    white_pawn_rows = ([], [], [], [], [], [], [], [])
+    black_pawn_rows = ([], [], [], [], [], [], [], [])
+    white_bishops = black_bishops = 0
+    bishops = []
+    knights = []
+    rooks = []
+    white_king = black_king = None
+    mg_phase = 0
+    phase_indicator = peSTO_pst.game_phase_indicator
+
+    for row in range(8):
+        board_row = board[row]
+        for column in range(8):
+            piece = board_row[column]
+            if not piece:
+                continue
+            kind = piece[1]
+            mg_phase += phase_indicator[kind]
+            if kind == "p":
+                if piece[0] == "w":
+                    white_pawn_rows[column].append(row)
+                else:
+                    black_pawn_rows[column].append(row)
+            elif kind == "B":
+                bishops.append((piece[0], row, column))
+                if piece[0] == "w":
+                    white_bishops += 1
+                else:
+                    black_bishops += 1
+            elif kind == "N":
+                knights.append((piece[0], row, column))
+            elif kind == "R":
+                rooks.append((piece[0], row, column))
+            elif kind == "K":
+                if piece[0] == "w":
+                    white_king = (row, column)
+                else:
+                    black_king = (row, column)
+
+    if (
+        mg_phase <= 1
+        and not rooks
+        and not any(white_pawn_rows)
+        and not any(black_pawn_rows)
+    ):
+        return None
+
+    white_rook_files = {}
+    black_rook_files = {}
+    for colour, row, column in rooks:
+        target = white_rook_files if colour == "w" else black_rook_files
+        target.setdefault(column, []).append(row)
+
+    mg = eg = 0
+
+    if white_bishops >= 2:
+        mg += 30
+        eg += 50
+    if black_bishops >= 2:
+        mg -= 30
+        eg -= 50
+
+    for colour, row, column in rooks:
+        white = colour == "w"
+        own = white_pawn_rows[column] if white else black_pawn_rows[column]
+        other = black_pawn_rows[column] if white else white_pawn_rows[column]
+        rook_mg = rook_eg = 0
+        if not own:
+            if not other:
+                rook_mg, rook_eg = 25, 15
+            else:
+                rook_mg, rook_eg = 12, 8
+        if row == (1 if white else 6):
+            rook_mg += 10
+            rook_eg += 20
+        if white:
+            mg += rook_mg
+            eg += rook_eg
+        else:
+            mg -= rook_mg
+            eg -= rook_eg
+
+    passed_mg = (0, 5, 10, 20, 35, 60, 100)
+    passed_eg = (0, 10, 25, 45, 75, 120, 180)
+
+    for column in range(8):
+        left = column - 1
+        right = column + 1
+
+        rows = white_pawn_rows[column]
+        if rows:
+            count = len(rows)
+            if count > 1:
+                mg -= 10 * (count - 1)
+                eg -= 20 * (count - 1)
+            if not (left >= 0 and white_pawn_rows[left]) and not (
+                right < 8 and white_pawn_rows[right]
+            ):
+                mg -= 12 * count
+                eg -= 18 * count
+            for row in rows:
+                passed = True
+                for f in (left, column, right):
+                    if 0 <= f < 8:
+                        for r in black_pawn_rows[f]:
+                            if r < row:
+                                passed = False
+                                break
+                    if not passed:
+                        break
+                if passed:
+                    progress = 6 - row
+                    mg += passed_mg[progress]
+                    eg += passed_eg[progress]
+                    if any(r > row for r in white_rook_files.get(column, ())):
+                        mg += 10
+                        eg += 25
+
+        rows = black_pawn_rows[column]
+        if rows:
+            count = len(rows)
+            if count > 1:
+                mg += 10 * (count - 1)
+                eg += 20 * (count - 1)
+            if not (left >= 0 and black_pawn_rows[left]) and not (
+                right < 8 and black_pawn_rows[right]
+            ):
+                mg += 12 * count
+                eg += 18 * count
+            for row in rows:
+                passed = True
+                for f in (left, column, right):
+                    if 0 <= f < 8:
+                        for r in white_pawn_rows[f]:
+                            if r > row:
+                                passed = False
+                                break
+                    if not passed:
+                        break
+                if passed:
+                    progress = row - 1
+                    mg -= passed_mg[progress]
+                    eg -= passed_eg[progress]
+                    if any(r < row for r in black_rook_files.get(column, ())):
+                        mg -= 10
+                        eg -= 25
+
+    for colour, row, column in knights:
+        if not 2 <= column <= 5:
+            continue
+        white = colour == "w"
+        if white and not 2 <= row <= 4:
+            continue
+        if not white and not 3 <= row <= 5:
+            continue
+        enemy_rows = black_pawn_rows if white else white_pawn_rows
+        own_rows = white_pawn_rows if white else black_pawn_rows
+        attackable = False
+        defended = False
+        for f in (column - 1, column + 1):
+            if not 0 <= f < 8:
+                continue
+            for r in enemy_rows[f]:
+                if (r < row) if white else (r > row):
+                    attackable = True
+                    break
+            if (row + 1 if white else row - 1) in own_rows[f]:
+                defended = True
+        if not attackable and defended:
+            if white:
+                mg += 16
+                eg += 10
+            else:
+                mg -= 16
+                eg -= 10
+
+    for colour, row, column in knights:
+        if colour == "w":
+            blocks = (
+                (row, column) == (5, 2)
+                and 6 in white_pawn_rows[2]
+                and 4 in white_pawn_rows[3]
+            )
+        else:
+            blocks = (
+                (row, column) == (2, 2)
+                and 1 in black_pawn_rows[2]
+                and 3 in black_pawn_rows[3]
+            )
+        if blocks:
+            if colour == "w":
+                mg -= 15
+            else:
+                mg += 15
+
+    for colour, row, column in bishops:
+        own_rows = white_pawn_rows if colour == "w" else black_pawn_rows
+        bishop_parity = (row + column) % 2
+        same_colour_pawns = 0
+        for f in range(8):
+            for r in own_rows[f]:
+                if (r + f) % 2 == bishop_parity:
+                    same_colour_pawns += 1
+        if colour == "w":
+            mg -= 3 * same_colour_pawns
+            eg -= 5 * same_colour_pawns
+        else:
+            mg += 3 * same_colour_pawns
+            eg += 5 * same_colour_pawns
+
+    if white_king and white_king[0] >= 6:
+        king_row, king_column = white_king
+        for f in (king_column - 1, king_column, king_column + 1):
+            if 0 <= f < 8:
+                shielded = False
+                for r in white_pawn_rows[f]:
+                    if king_row - 2 <= r < king_row:
+                        shielded = True
+                        break
+                if not shielded:
+                    mg -= 12
+
+    if black_king and black_king[0] <= 1:
+        king_row, king_column = black_king
+        for f in (king_column - 1, king_column, king_column + 1):
+            if 0 <= f < 8:
+                shielded = False
+                for r in black_pawn_rows[f]:
+                    if king_row < r <= king_row + 2:
+                        shielded = True
+                        break
+                if not shielded:
+                    mg += 12
+
+    if white_move:
+        mg += 15
+        eg += 5
+    else:
+        mg -= 15
+        eg -= 5
+
+    if mg_phase > 24:
+        mg_phase = 24
+    return (mg * mg_phase + eg * (24 - mg_phase)) / 24
 
 
 def get_board_evaluation(game_state: GameState, valid_moves: list[Move]) -> float:
@@ -398,7 +709,12 @@ def get_board_evaluation(game_state: GameState, valid_moves: list[Move]) -> floa
     # Calculates the evaluation of the position otherwise
     peSTO_evaluation = peSTO_pst.get_board_evaluation(game_state.board)
 
-    return peSTO_evaluation
+    positional = positional_evaluation(game_state.board, game_state.white_move)
+
+    if positional is None:
+        return 0
+
+    return peSTO_evaluation + positional
 
 
 def compare_evaluations(

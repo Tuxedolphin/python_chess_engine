@@ -32,7 +32,7 @@
         "additional_lines_rgx": [],
         "event_name": "Fastchess Tournament",
         "site": "?",
-        "file": "elo_results/vs_stockfish_1320.pgn",
+        "file": "/tmp/timing_bundle.pgn",
         "notation": 0,
         "append_file": true,
         "track_nodes": false,
@@ -60,7 +60,7 @@
     },
     "config_name": "config.json",
     "output": 0,
-    "seed": 12358937236426612563,
+    "seed": 12003729422371692591,
     "variant": 0,
     "type": 0,
     "gauntlet_seeds": 1,
@@ -69,7 +69,7 @@
     "wait": 0,
     "autosaveinterval": 20,
     "games": 2,
-    "rounds": 1,
+    "rounds": 10,
     "concurrency": 2,
     "force_concurrency": false,
     "recover": true,
@@ -88,46 +88,37 @@
     },
     "engines": [
         {
-            "name": "python_chess_engine",
+            "name": "new-timing",
             "dir": ".",
-            "cmd": "/opt/homebrew/bin/python3",
+            "cmd": "/opt/homebrew/bin/pypy3.11",
             "args": "uci.py",
             "restart": false,
             "options": [],
             "limit": {
                 "tc": {
-                    "increment": 0,
+                    "increment": 3000,
                     "fixed_time": 0,
-                    "time": 0,
+                    "time": 300000,
                     "moves": 0,
                     "timemargin": 0
                 },
                 "nodes": 0,
-                "plies": 1
+                "plies": 0
             },
             "variant": 0
         },
         {
-            "name": "stockfish-1320",
-            "dir": "",
-            "cmd": "stockfish",
-            "args": "",
+            "name": "old-timing",
+            "dir": "/tmp/engine_old_timing",
+            "cmd": "/opt/homebrew/bin/pypy3.11",
+            "args": "uci.py",
             "restart": false,
-            "options": [
-                [
-                    "UCI_LimitStrength",
-                    "true"
-                ],
-                [
-                    "UCI_Elo",
-                    "1320"
-                ]
-            ],
+            "options": [],
             "limit": {
                 "tc": {
-                    "increment": 0,
-                    "fixed_time": 500,
-                    "time": 0,
+                    "increment": 3000,
+                    "fixed_time": 0,
+                    "time": 300000,
                     "moves": 0,
                     "timemargin": 0
                 },
@@ -138,16 +129,16 @@
         }
     ],
     "stats": {
-        "python_chess_engine vs stockfish-1320": {
-            "wins": 0,
-            "losses": 2,
-            "draws": 0,
-            "penta_WW": 0,
-            "penta_WD": 0,
-            "penta_WL": 0,
-            "penta_DD": 0,
-            "penta_LD": 0,
-            "penta_LL": 1
+        "new-timing vs old-timing": {
+            "wins": 6,
+            "losses": 9,
+            "draws": 5,
+            "penta_WW": 1,
+            "penta_WD": 1,
+            "penta_WL": 3,
+            "penta_DD": 1,
+            "penta_LD": 2,
+            "penta_LL": 2
         }
     }
 }

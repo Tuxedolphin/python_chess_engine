@@ -76,6 +76,12 @@ class GameState:
         self.board_hash = self.compute_board_hash()
         self.board_hash_log = [self.board_hash]
 
+        position_key = self.zobrist_key()
+        self.position_key_log = [position_key]
+        self.position_counts = {position_key: 1}
+
+        self.en_passant_log = [self.en_passant_square]
+
     def compute_board_hash(self) -> int:
         board_hash = 0
         for row in range(8):
@@ -230,6 +236,14 @@ class GameState:
         self.board_hash_log.append(new_hash)
 
         self.white_move = not self.white_move
+
+        self.en_passant_log.append(self.en_passant_square)
+
+        position_key = self.zobrist_key()
+        self.position_key_log.append(position_key)
+        self.position_counts[position_key] = (
+            self.position_counts.get(position_key, 0) + 1
+        )
         
         if move.piece_moved[1] == "p":
             fifty_move_rule_reset = True
@@ -311,6 +325,14 @@ class GameState:
 
             self.board_hash_log.pop()
             self.board_hash = self.board_hash_log[-1]
+
+            position_key = self.position_key_log.pop()
+            self.position_counts[position_key] -= 1
+            if not self.position_counts[position_key]:
+                del self.position_counts[position_key]
+
+            self.en_passant_log.pop()
+            self.en_passant_square = self.en_passant_log[-1]
             
 
     def get_valid_moves(self) -> list:
@@ -371,7 +393,16 @@ class GameState:
 
                     if move.piece_moved[1] != "K":
 
-                        if not (move.end_row, move.end_column) in valid_squares:
+                        captures_checker_en_passant = (
+                            move.is_en_passant
+                            and (move.start_row, move.end_column)
+                            == (check[0], check[1])
+                        )
+
+                        if (
+                            (move.end_row, move.end_column) not in valid_squares
+                            and not captures_checker_en_passant
+                        ):
                             moves.remove(move)
 
             # Else it is double or triple check, and the king has to move
@@ -531,16 +562,70 @@ class GameState:
     def square_attacked(self, square: tuple) -> bool:
         """Returns bool of if the square is under attack by opponent"""
 
-        # Switch turns to get the opponents turns
-        self.white_move = not self.white_move
-        opponents_moves = self.get_all_moves(True)
-        self.white_move = not self.white_move
+        row, column = square
+        opponent = "b" if self.white_move else "w"
 
-        for move in opponents_moves:
+        pawn_row = row + 1 if opponent == "w" else row - 1
+        if 0 <= pawn_row < self.dimensions:
+            for pawn_column in (column - 1, column + 1):
+                if (
+                    0 <= pawn_column < self.dimensions
+                    and self.board[pawn_row][pawn_column] == opponent + "p"
+                ):
+                    return True
 
-            # If the opponent can attack the square
-            if move.end_row == square[0] and move.end_column == square[1]:
+        for row_offset, column_offset in (
+            (-2, -1),
+            (-2, 1),
+            (-1, -2),
+            (-1, 2),
+            (1, -2),
+            (1, 2),
+            (2, -1),
+            (2, 1),
+        ):
+            knight_row = row + row_offset
+            knight_column = column + column_offset
+            if (
+                0 <= knight_row < self.dimensions
+                and 0 <= knight_column < self.dimensions
+                and self.board[knight_row][knight_column] == opponent + "N"
+            ):
                 return True
+
+        for row_direction, column_direction in (
+            (-1, 0),
+            (1, 0),
+            (0, -1),
+            (0, 1),
+            (-1, -1),
+            (-1, 1),
+            (1, -1),
+            (1, 1),
+        ):
+            for distance in range(1, self.dimensions):
+                attack_row = row + row_direction * distance
+                attack_column = column + column_direction * distance
+                if not (
+                    0 <= attack_row < self.dimensions
+                    and 0 <= attack_column < self.dimensions
+                ):
+                    break
+
+                piece = self.board[attack_row][attack_column]
+                if not piece:
+                    continue
+
+                if piece.startswith(opponent):
+                    piece_type = piece[1]
+                    diagonal = row_direction != 0 and column_direction != 0
+                    if distance == 1 and piece_type == "K":
+                        return True
+                    if diagonal and piece_type in ("B", "Q"):
+                        return True
+                    if not diagonal and piece_type in ("R", "Q"):
+                        return True
+                break
 
         return False
 

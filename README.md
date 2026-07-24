@@ -72,6 +72,17 @@ python3 uci.py
 
 `scripts/engine.sh` is a launcher that picks a suitable Python and starts the adapter — point GUIs and tools at that. Search depth defaults to 3 and can be changed with `setoption name Depth value N` or `go depth N`.
 
+### Time Management
+
+When given a clock (`go wtime ... winc ...`), the engine allocates time per move with a two-level scheme modelled on standard practice:
+
+- **Soft bound** (target): `remaining/12 + increment/2`, scaled by an opening ramp `min(0.35 + 0.025 × ply, 1.0)` so early moves spend roughly a third of the budget and the middlegame gets the banked time — the same shape Stockfish's `optScale` uses.
+- **Hard bound** (ceiling): `2 × soft`, capped at a quarter of the remaining clock, enforced *inside* the search — a deadline check at every node aborts a too-long iteration and plays the best move from the last completed depth.
+- A new iteration only starts below 50% of the soft bound (35% when consecutive depths agree on the best move), and only if its predicted cost — 6× the previous iteration's time — fits the budget: within the soft bound for stable positions, up to 1.6× when the best move is still changing between depths.
+- Search stops immediately once a forced mate is proven; positions with a single legal move are answered instantly.
+
+Iterative deepening plus cheap endgame positions means the search depth rises naturally as material comes off — typically depth 4–5 in middlegames and 10+ in late endgames at blitz time controls. `go movetime N` is honoured as a hard cap.
+
 ## Estimating Its Strength
 
 `scripts/estimate_elo.sh` plays rating matches against strength-limited [Stockfish](https://stockfishchess.org/) using [fastchess](https://github.com/Disservin/fastchess) and prints an Elo estimate per level:
