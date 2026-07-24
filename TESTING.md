@@ -23,6 +23,22 @@ Combined Stockfish ladder estimate: **~2,050–2,100 at 20s/move** (M3, PyPy).
 
 Run each overnight; one at a time, Mac plugged in + `caffeinate -is`.
 
+0. **A/B queue (2026-07-24), overnight candidates — real `tc=300+3`, ≥20
+   games each, per the timing convention:**
+   - *Piece-count time budget* (remaining/10 + taper below 14 pieces,
+     shipped 2026-07-24 with the EGTB rationale) vs the old flat
+     remaining/12 build. First priority — it shipped unvalidated.
+   - *Opening book: Scandinavian 3...Qd6 vs Werle 1.e4 e5* as Black.
+     Werle PGN kept in repo root (dump format — needs the converter in a
+     variant of scripts/build_repertoire_book.py). Build a second
+     opening_book variant, A/B the two books.
+   - *challenge_timeout 1 vs 5+ min*: 1-min set live 2026-07-24 for
+     observation; decide keep/revert from a few days of matchmaking
+     behaviour (declines, rate limits), not Elo.
+   - *Legacy-book overrides*: measure whether curated d4/Scandi/Slav lines
+     outperform the old c4 machine book head-to-head (old book build vs
+     new, same engine).
+
 1. **Stockfish ladder, 2300 rung — partially played, resume pending.**
    With the extended 14,762-entry book, combined so far: **1 win, 10 losses,
    2 draws** (2/13 = 15%; PGNs /tmp/elo_2300_extbook.pgn +

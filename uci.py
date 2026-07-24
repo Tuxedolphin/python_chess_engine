@@ -158,8 +158,16 @@ def time_budget(game_state: GameState, params: dict) -> tuple[float, float] | No
         return None
 
     increment = params.get("winc" if game_state.white_move else "binc", 0)
-    soft = (remaining / 12 + increment / 2) / 1000
+    soft = (remaining / 10 + increment / 2) / 1000
     soft *= min(0.35 + len(game_state.move_log) * 0.025, 1.0)
+
+    # Spend while the position is complex; taper as material comes off.
+    # At <= 7 pieces the lichess tablebase plays for us (needs >= 10s on the
+    # clock, so the saved time also protects that probe window).
+    pieces = sum(1 for row in game_state.board for square in row if square)
+    if pieces < 14:
+        soft *= max(0.5, 0.5 + 0.5 * (pieces - 8) / 6)
+
     hard = min(soft * 2, remaining / 4 / 1000)
     return soft, hard
 
