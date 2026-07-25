@@ -249,7 +249,7 @@ def handle_go(game_state_holder: dict, tokens: list[str], default_depth: int) ->
     chess_ai.SEARCH_DEADLINE = None
     elapsed = time.monotonic() - start
     print(
-        f"info depth {reached_depth} score cp {int(evaluation * 100)}"
+        f"info depth {reached_depth} score cp {int(evaluation)}"
         f" time {int(elapsed * 1000)}",
         flush=True,
     )
