@@ -3,3 +3,6 @@ pycache
 
 __pycache__
 elo_results/
+
+# Licensed opening-course PGNs used to build the book; keep local
+book_sources/
