@@ -1,0 +1,7 @@
+services:
+  lichess-bot:
+    build: .
+    container_name: tuxedolphin-bot
+    restart: unless-stopped
+    volumes:
+      - .:/lichess-bot/config
